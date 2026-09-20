@@ -45,10 +45,18 @@ jobs:
         run: choco install wixtoolset --yes --no-progress
 
       - name: Restore NuGet packages
-        run: msbuild "Project Files/Source/Thetis_VS2026.sln" -t:Restore -p:Configuration=Release -p:Platform=x64 -m -nologo
+        run: msbuild "Project Files/Source/Console/Thetis.csproj" -t:Restore -p:Configuration=Release -p:Platform=x64 -m -nologo
 
-      - name: Build solution
-        run: msbuild "Project Files/Source/Thetis_VS2026.sln" -p:Configuration=Release -p:Platform=x64 -m -nologo
+      - name: Build Thetis
+        run: msbuild "Project Files/Source/Console/Thetis.csproj" -p:Configuration=Release -p:Platform=x64 -m -nologo
+
+      - name: Stage native prebuilt binaries
+        shell: pwsh
+        run: |
+          $dest = "Project Files/bin/x64/Release"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item "Project Files/lib/prebuilt-x64/*" $dest -Force
+          Get-ChildItem $dest -File | Select-Object Name, Length | Format-Table -AutoSize
 
       - name: Build MSI installer
         run: |
