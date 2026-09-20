@@ -1978,6 +1978,11 @@ namespace Thetis
             if (sortedList.Contains("comboRadioModel") && controls.ContainsKey("comboRadioModel"))
             {
                 string val = a["comboRadioModel"];
+                if (val != null && val.IndexOf("HERMES-LITE", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    val = "HERMES";
+                    a["comboRadioModel"] = val;
+                }
                 if (!comboRadioModel.Items.Contains(val))
                 {
                     DialogResult dr = MessageBox.Show($"The radio model stored in the database is not known by this version of SDR-VST3 [{val}]. \n\nAre you using the correct version ? It will be reset back to HERMES.",
@@ -14621,31 +14626,6 @@ namespace Thetis
 
         private void btnN2ADRFilter_Click(object sender, EventArgs e)
         {
-            ApplyN2ADRFilterBoard();
-        }
-
-        private void ApplyN2ADRFilterBoard()
-        {
-            foreach (Control c in grpPennyExtCtrl.Controls)
-            {
-                if (c.Name.StartsWith("chkPenOC") && c is CheckBoxTS)
-                    ((CheckBoxTS)c).Checked = false;
-            }
-
-            // N2ADR LPF: OC0=160, OC1=80, OC2=60/40, OC3=30/20, OC4=17/15, OC5=12/10, OC6=6
-            chkPenOCrcv1601.Checked = true; chkPenOCxmit1601.Checked = true;
-            chkPenOCrcv802.Checked = true; chkPenOCxmit802.Checked = true;
-            chkPenOCrcv603.Checked = true; chkPenOCxmit603.Checked = true;
-            chkPenOCrcv403.Checked = true; chkPenOCxmit403.Checked = true;
-            chkPenOCrcv304.Checked = true; chkPenOCxmit304.Checked = true;
-            chkPenOCrcv204.Checked = true; chkPenOCxmit204.Checked = true;
-            chkPenOCrcv175.Checked = true; chkPenOCxmit175.Checked = true;
-            chkPenOCrcv155.Checked = true; chkPenOCxmit155.Checked = true;
-            chkPenOCrcv126.Checked = true; chkPenOCxmit126.Checked = true;
-            chkPenOCrcv106.Checked = true; chkPenOCxmit106.Checked = true;
-            chkPenOCrcv67.Checked = true; chkPenOCxmit67.Checked = true;
-
-            chkPennyExtCtrl.Checked = true;
         }
 
         private void btnPennyCtrlVHFReset_Click(object sender, EventArgs e)
@@ -20484,14 +20464,10 @@ namespace Thetis
             HPSDRModel new_model = HardwareSpecific.StringModelToEnum(comboRadioModel.Text);
             HardwareSpecific.Model = new_model;
 
-            if (btnN2ADRFilter != null)
-                btnN2ADRFilter.Visible = new_model == HPSDRModel.HERMESLITE;
-            if (new_model != HPSDRModel.HERMESLITE)
-            {
-                chkApolloPresent.Text = "Apollo";
-                if (grpApolloCtrl != null) grpApolloCtrl.Text = "Apollo Control";
-                if (tpApolloApollo != null) tpApolloApollo.Text = "Apollo";
-            }
+            chkApolloPresent.Text = "Apollo";
+            if (grpApolloCtrl != null) grpApolloCtrl.Text = "Apollo Control";
+            if (tpApolloApollo != null) tpApolloApollo.Text = "Apollo";
+            if (btnN2ADRFilter != null) btnN2ADRFilter.Visible = false;
 
             console.SetupForHPSDRModel();
 
@@ -20504,49 +20480,6 @@ namespace Thetis
 
             switch (HardwareSpecific.Model)
             {
-                case HPSDRModel.HERMESLITE:
-                    chkAlexPresent.Checked = false;
-                    chkAlexPresent.Enabled = false;
-                    chkApolloPresent.Enabled = true;
-                    chkApolloPresent.Text = "Enable PA";
-                    pnlGeneralHardwareORION.Enabled = false;
-
-                    chkGeneralRXOnly.Visible = true;
-                    chkHermesStepAttenuator.Enabled = true;
-                    udHermesStepAttenuatorData.Enabled = true;
-                    chkRX2StepAtt.Checked = false;
-                    chkRX2StepAtt.Enabled = false;
-                    udHermesStepAttenuatorDataRX2.Enabled = false;
-                    chkAutoPACalibrate.Checked = false;
-                    chkAutoPACalibrate.Visible = false;
-                    labelRXAntControl.Text = "  RX1   RX2    XVTR";
-                    RXAntChk1Name = "RX1";
-                    RXAntChk2Name = "RX2";
-                    RXAntChk3Name = "XVTR";
-                    labelATTOnTX.Visible = true;
-                    udATTOnTX.Visible = true;
-                    chkRxOutOnTx.Text = "RX 1 OUT on Tx";
-                    chkEXT1OutOnTx.Text = "RX 2 IN on Tx";
-                    chkEXT2OutOnTx.Text = "RX 1 IN on Tx";
-                    chkEXT2OutOnTx.Visible = true;
-                    chkDisableRXOut.Visible = false;
-                    chkBPF2Gnd.Visible = false;
-                    chkAutoATTRx1.Enabled = false;
-                    chkAutoATTRx2.Enabled = false;
-                    setupAttRXControls(1);
-                    setupAttRXControls(2);
-                    if (grpApolloCtrl != null) grpApolloCtrl.Text = "PA Control";
-                    if (tpApolloApollo != null) tpApolloApollo.Text = "PA";
-                    if (btnN2ADRFilter != null) btnN2ADRFilter.Visible = true;
-                    if (sender != this)
-                    {
-                        chkApolloPresent.Checked = true;
-                        chkPennyExtCtrl.Checked = true;
-                        ApplyN2ADRFilterBoard();
-                    }
-                    chkApolloPresent_CheckedChanged(this, EventArgs.Empty);
-                    break;
-
                 case HPSDRModel.HERMES:
                     chkApolloPresent.Text = "Apollo";
                     if (grpApolloCtrl != null) grpApolloCtrl.Text = "Apollo Control";
@@ -37857,7 +37790,7 @@ namespace Thetis
                     NetworkIO.SelectedRadioProtocol = RadioProtocol.ETH;
                     break;
                 default:
-                    NetworkIO.SelectedRadioProtocol = RadioProtocol.ETH; //eek
+                    NetworkIO.SelectedRadioProtocol = RadioProtocol.ETH;
                     break;
             }
 

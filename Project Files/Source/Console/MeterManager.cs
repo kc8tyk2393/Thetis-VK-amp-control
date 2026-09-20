@@ -3157,6 +3157,19 @@ namespace Thetis
                 uc.Locked = locked;
             }
         }
+
+        public static void UnlockAllContainers()
+        {
+            lock (_metersLock)
+            {
+                if (_lstUCMeters == null) return;
+                foreach (KeyValuePair<string, ucMeter> kvp in _lstUCMeters)
+                {
+                    kvp.Value.Locked = false;
+                    kvp.Value.NoControls = false;
+                }
+            }
+        }
         public static void SetContainerRX(string sId, int rx)
         {
             lock (_metersLock)
@@ -6072,6 +6085,8 @@ namespace Thetis
             zeroAllMeters();
 
             _finishedSetup = true;
+
+            UnlockAllContainers();
 
             lock (_metersLock)
             {

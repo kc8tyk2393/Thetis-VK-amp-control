@@ -156,6 +156,7 @@ namespace Thetis
 
         public RAForm raForm;
         public ucHeliosDx heliosDxBox;
+        private ConsoleContainerLayout _containerLayout;
         public Path_Illustrator path_Illustrator;
 
         public MemoryForm memoryForm;
@@ -1090,6 +1091,9 @@ namespace Thetis
             //legacy items controller
             LegacyItemController.Init(this);
             LegacyItemController.Update();
+
+            if (_containerLayout == null)
+                _containerLayout = new ConsoleContainerLayout(this);
 
             //display render thread
 #if SNOWFALL
@@ -44103,6 +44107,19 @@ namespace Thetis
                 menuStrip1.Items.Insert(raIndex + 1, item);
             else
                 menuStrip1.Items.Add(item);
+
+            ToolStripMenuItem layout = new ToolStripMenuItem("Reset panel layout");
+            layout.ForeColor = SystemColors.ControlLightLight;
+            layout.Click += (s, e) =>
+            {
+                MeterManager.UnlockAllContainers();
+                _containerLayout?.ResetAll();
+            };
+            int hx = menuStrip1.Items.IndexOf(item);
+            if (hx >= 0)
+                menuStrip1.Items.Insert(hx + 1, layout);
+            else
+                menuStrip1.Items.Add(layout);
         }
 
         public void ShowHeliosDxBox()
@@ -44114,6 +44131,7 @@ namespace Thetis
                 heliosDxBox.Visible = false;
                 this.Controls.Add(heliosDxBox);
                 heliosDxBox.RestoreState();
+                _containerLayout?.Register(heliosDxBox);
             }
             heliosDxBox.ShowBox();
         }

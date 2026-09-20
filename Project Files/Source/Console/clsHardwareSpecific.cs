@@ -417,7 +417,7 @@ namespace Thetis
                 case "HERMES LITE 2":
                 case "HERMES-LITE2":
                 case "HERMES-LITE 2":
-                    return HPSDRModel.HERMESLITE;
+                    return HPSDRModel.HERMES;
                 case "RED-PITAYA":
                     return HPSDRModel.REDPITAYA;
                 case "ANAN-G2E":
@@ -547,22 +547,9 @@ namespace Thetis
 
             switch (model) 
             {
-                case HPSDRModel.HERMESLITE:
-                    gains[(int)Band.B160M] = 100f;
-                    gains[(int)Band.B80M] = 100f;
-                    gains[(int)Band.B60M] = 100f;
-                    gains[(int)Band.B40M] = 100f;
-                    gains[(int)Band.B30M] = 100f;
-                    gains[(int)Band.B20M] = 100f;
-                    gains[(int)Band.B17M] = 100f;
-                    gains[(int)Band.B15M] = 100f;
-                    gains[(int)Band.B12M] = 100f;
-                    gains[(int)Band.B10M] = 100f;
-                    gains[(int)Band.B6M] = 100f;
-                    return gains;
-
                 case HPSDRModel.FIRST:
                 case HPSDRModel.HERMES:
+                case HPSDRModel.HERMESLITE:
                 case HPSDRModel.HPSDR:
                 case HPSDRModel.ORIONMKII:
                     gains[(int)Band.B160M] = 41.0f;

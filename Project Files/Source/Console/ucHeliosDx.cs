@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -70,12 +71,30 @@ namespace Thetis
         private static extern int GetWindowTextLength(IntPtr hWnd);
 
         private const uint OBJID_CLIENT = 0xFFFFFFFC;
+        private const uint BM_CLICK = 0x00F5;
 
         [DllImport("oleacc.dll")]
         private static extern int AccessibleObjectFromWindow(IntPtr hwnd, uint dwObjectID, ref Guid riid,
             [MarshalAs(UnmanagedType.Interface)] out object ppvObject);
 
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
         private static readonly Guid IID_IAccessible = new Guid("618736E0-3C3D-11CF-810C-00AA00389B71");
+        private static readonly Guid CLSID_CUIAutomation = new Guid("ff48dba4-60ef-4201-aa87-54103eef594e");
+        private const int UIA_NamePropertyId = 30005;
+        private const int UIA_AutomationIdPropertyId = 30011;
+        private const int UIA_InvokePatternId = 10000;
+        private const int UIA_ValuePatternId = 10002;
+        private const int UIA_TogglePatternId = 10015;
+        private const int UIA_SelectionItemPatternId = 10010;
+        private const int UIA_LegacyIAccessibleStatePropertyId = 30050;
+        private const int TreeScope_Descendants = 4;
+        private const int STATE_SYSTEM_SELECTED = 0x2;
+        private const int STATE_SYSTEM_PRESSED = 0x8;
+        private const int STATE_SYSTEM_CHECKED = 0x10;
+        private static readonly Color MeterBtnOff = Color.FromArgb(30, 150, 45);
+        private static readonly Color MeterBtnOn = Color.FromArgb(180, 90, 20);
 
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT
@@ -116,6 +135,11 @@ namespace Thetis
         private LabelTS lblPwrUnit;
         private LabelTS lblSwrCaption;
         private LabelTS lblSwrValue;
+        private LabelTS lblVoltsValue;
+        private PanelTS pnlFan;
+        private ButtonTS btnBypass;
+        private ButtonTS btnCooling;
+        private int _lastHeliosClickTick;
         private PanelTS pnlHost;
         private PanelTS pnlGrab;
         private Timer tmrAttach;
@@ -266,7 +290,7 @@ namespace Thetis
             {
                 AutoSize = false,
                 Location = new Point(6, 22),
-                Size = new Size(118, 36),
+                Size = new Size(72, 36),
                 Text = "----",
                 Font = new Font("Consolas", 22f, FontStyle.Bold),
                 ForeColor = Color.Lime,
@@ -275,8 +299,8 @@ namespace Thetis
             lblPwrUnit = new LabelTS
             {
                 AutoSize = false,
-                Location = new Point(126, 30),
-                Size = new Size(28, 22),
+                Location = new Point(80, 30),
+                Size = new Size(22, 22),
                 Text = "W",
                 ForeColor = Color.Gray,
                 TextAlign = ContentAlignment.MiddleLeft
@@ -284,8 +308,8 @@ namespace Thetis
             lblSwrCaption = new LabelTS
             {
                 AutoSize = false,
-                Location = new Point(188, 6),
-                Size = new Size(50, 18),
+                Location = new Point(108, 6),
+                Size = new Size(48, 18),
                 Text = "SWR",
                 ForeColor = Color.Gray,
                 TextAlign = ContentAlignment.MiddleLeft
@@ -293,19 +317,43 @@ namespace Thetis
             lblSwrValue = new LabelTS
             {
                 AutoSize = false,
-                Location = new Point(176, 22),
-                Size = new Size(160, 36),
+                Location = new Point(104, 22),
+                Size = new Size(64, 36),
                 Text = "--.--",
-                Font = new Font("Consolas", 22f, FontStyle.Bold),
+                Font = new Font("Consolas", 20f, FontStyle.Bold),
                 ForeColor = Color.Lime,
                 TextAlign = ContentAlignment.MiddleLeft
             };
+            lblVoltsValue = new LabelTS
+            {
+                AutoSize = false,
+                Location = new Point(170, 22),
+                Size = new Size(90, 36),
+                Text = "--V",
+                Font = new Font("Consolas", 20f, FontStyle.Bold),
+                ForeColor = Color.Lime,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            pnlFan = new PanelTS
+            {
+                Size = new Size(20, 20),
+                Location = new Point(318, 22),
+                BackColor = Color.FromArgb(18, 18, 18),
+                Visible = false
+            };
+            pnlFan.Paint += PnlFan_Paint;
+            btnBypass = MakeMeterButton("BYP", BtnBypass_Click);
+            btnCooling = MakeMeterButton("COOL", BtnCooling_Click);
 
             pnlMeters.Controls.Add(lblPwrCaption);
             pnlMeters.Controls.Add(lblPwrValue);
             pnlMeters.Controls.Add(lblPwrUnit);
             pnlMeters.Controls.Add(lblSwrCaption);
             pnlMeters.Controls.Add(lblSwrValue);
+            pnlMeters.Controls.Add(lblVoltsValue);
+            pnlMeters.Controls.Add(pnlFan);
+            pnlMeters.Controls.Add(btnBypass);
+            pnlMeters.Controls.Add(btnCooling);
             pnlMeters.Resize += PnlMeters_Resize;
 
             pnlGrab = new PanelTS
@@ -600,13 +648,303 @@ namespace Thetis
             if (!Visible || _collapsed) return;
             KeepHeliosInside();
             RefreshHeliosMeters();
+            RefreshHeliosModeButtons();
+        }
+
+        private ButtonTS MakeMeterButton(string text, EventHandler click)
+        {
+            var b = new ButtonTS();
+            b.Text = text;
+            b.Size = new Size(46, 40);
+            b.FlatStyle = FlatStyle.Flat;
+            b.ForeColor = Color.White;
+            b.BackColor = MeterBtnOff;
+            b.FlatAppearance.BorderColor = Color.FromArgb(90, 90, 90);
+            b.Click += click;
+            return b;
         }
 
         private void PnlMeters_Resize(object sender, EventArgs e)
         {
-            int mid = pnlMeters.ClientSize.Width / 2;
-            lblSwrCaption.Left = mid + 8;
-            lblSwrValue.Left = mid + 4;
+            int w = 46;
+            btnCooling.Location = new Point(Math.Max(220, pnlMeters.ClientSize.Width - w - 6), 12);
+            btnBypass.Location = new Point(btnCooling.Left - 4 - w, 12);
+            int right = btnBypass.Left - 6;
+            if (pnlFan.Visible)
+            {
+                pnlFan.Location = new Point(right - 20, 30);
+                right = pnlFan.Left - 6;
+            }
+
+            lblPwrCaption.Location = new Point(8, 6);
+            lblPwrValue.Location = new Point(6, 22);
+            lblPwrValue.Width = 72;
+            lblPwrUnit.Location = new Point(lblPwrValue.Right + 2, 30);
+
+            int swrLeft = lblPwrUnit.Right + 12;
+            lblSwrCaption.Location = new Point(swrLeft, 6);
+            lblSwrCaption.Size = new Size(48, 18);
+            lblSwrValue.Location = new Point(swrLeft, 22);
+            lblSwrValue.Width = 64;
+
+            int voltsLeft = lblSwrValue.Right + 8;
+            lblVoltsValue.Location = new Point(voltsLeft, 22);
+            lblVoltsValue.Size = new Size(Math.Max(48, right - voltsLeft), 36);
+        }
+
+        private void PnlFan_Paint(object sender, PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (var p = new Pen(Color.DeepSkyBlue, 2f))
+            using (var b = new SolidBrush(Color.DeepSkyBlue))
+            {
+                e.Graphics.DrawEllipse(p, 2, 2, 16, 16);
+                e.Graphics.FillPolygon(b, new[]
+                {
+                    new Point(10, 3), new Point(12, 9), new Point(8, 9)
+                });
+                e.Graphics.FillPolygon(b, new[]
+                {
+                    new Point(16, 13), new Point(10, 11), new Point(12, 15)
+                });
+                e.Graphics.FillPolygon(b, new[]
+                {
+                    new Point(4, 13), new Point(10, 11), new Point(8, 15)
+                });
+                e.Graphics.FillEllipse(b, 8, 8, 4, 4);
+            }
+        }
+
+        private static readonly string[] BypassIds = { "byPass_button", "ByPass", "byPass" };
+        private static readonly string[] BypassNames = { "Bypass", "ByPass", "BYPASS" };
+        private static readonly string[] CoolingIds = { "cooling_button", "Cooling" };
+        private static readonly string[] CoolingNames = { "Cooling", "Cool" };
+
+        private void BtnBypass_Click(object sender, EventArgs e)
+        {
+            if (ClickHeliosControl(BypassIds, BypassNames, "Bypass"))
+                ScheduleModeSync();
+        }
+
+        private void BtnCooling_Click(object sender, EventArgs e)
+        {
+            if (ClickHeliosControl(CoolingIds, CoolingNames, "Cooling"))
+                ScheduleModeSync();
+        }
+
+        private void ScheduleModeSync()
+        {
+            var delay = new Timer { Interval = 180 };
+            delay.Tick += (s, e) =>
+            {
+                delay.Stop();
+                delay.Dispose();
+                RefreshHeliosModeButtons();
+            };
+            delay.Start();
+            var delay2 = new Timer { Interval = 450 };
+            delay2.Tick += (s, e) =>
+            {
+                delay2.Stop();
+                delay2.Dispose();
+                RefreshHeliosModeButtons();
+            };
+            delay2.Start();
+        }
+
+        private void SetModeLights(bool bypassOn, bool coolingOn)
+        {
+            SetMeterButtonLit(btnBypass, bypassOn);
+            SetMeterButtonLit(btnCooling, coolingOn);
+        }
+
+        private static void SetMeterButtonLit(ButtonTS b, bool on)
+        {
+            if (b == null) return;
+            Color c = on ? MeterBtnOn : MeterBtnOff;
+            if (b.BackColor != c) b.BackColor = c;
+        }
+
+        private void RefreshHeliosModeButtons()
+        {
+            if (!IsWindow(_heliosHwnd)) return;
+            string mode = GetHeliosBandLabel();
+            if (string.IsNullOrEmpty(mode)) return;
+            if (mode.IndexOf("pass", StringComparison.OrdinalIgnoreCase) >= 0)
+                SetModeLights(true, false);
+            else if (mode.IndexOf("cool", StringComparison.OrdinalIgnoreCase) >= 0)
+                SetModeLights(false, true);
+            else
+                SetModeLights(false, false);
+        }
+
+        private string GetHeliosBandLabel()
+        {
+            try
+            {
+                dynamic el = FindHeliosUiaElement(
+                    new[] { "band_label_value", "band_label", "Band" },
+                    new[] { "band_label_value" });
+                if (el != null)
+                {
+                    try
+                    {
+                        object n = el.GetCurrentPropertyValue(UIA_NamePropertyId);
+                        string s = (n ?? "").ToString().Trim();
+                        if (!string.IsNullOrEmpty(s) &&
+                            !string.Equals(s, "Band", StringComparison.OrdinalIgnoreCase) &&
+                            !string.Equals(s, "band_label_value", StringComparison.OrdinalIgnoreCase))
+                            return s;
+                    }
+                    catch { }
+                    try
+                    {
+                        dynamic val = el.GetCurrentPattern(UIA_ValuePatternId);
+                        if (val != null)
+                        {
+                            string s = Convert.ToString(val.CurrentValue);
+                            if (!string.IsNullOrEmpty(s)) return s.Trim();
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
+            try
+            {
+                Guid iid = IID_IAccessible;
+                if (AccessibleObjectFromWindow(_heliosHwnd, OBJID_CLIENT, ref iid, out object obj) == 0 && obj != null)
+                {
+                    dynamic acc = obj;
+                    int count = 0;
+                    try { count = Convert.ToInt32(acc.accChildCount); } catch { return null; }
+                    for (int i = 0; i <= count; i++)
+                    {
+                        string name = "";
+                        try
+                        {
+                            object n = acc.get_accName(i);
+                            name = (n ?? "").ToString().Trim();
+                        }
+                        catch { continue; }
+                        if (string.Equals(name, "band_label_value", StringComparison.OrdinalIgnoreCase))
+                        {
+                            try
+                            {
+                                object v = acc.get_accValue(i);
+                                string s = (v ?? "").ToString().Trim();
+                                if (!string.IsNullOrEmpty(s)) return s;
+                            }
+                            catch { }
+                        }
+                    }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private bool ClickHeliosControl(string[] automationIds, string[] names, string label)
+        {
+            if (_heliosHwnd == IntPtr.Zero || !IsWindow(_heliosHwnd))
+                _heliosHwnd = FindHeliosWindow();
+            if (!IsWindow(_heliosHwnd))
+            {
+                SetStatus("Helios not found for " + label + ".");
+                return false;
+            }
+            int now = Environment.TickCount;
+            if (now - _lastHeliosClickTick >= 0 && now - _lastHeliosClickTick < 80) return false;
+            _lastHeliosClickTick = now;
+
+            if (InvokeHeliosUia(automationIds, names))
+            {
+                SetStatus("Helios " + label + ".");
+                return true;
+            }
+            IntPtr btn = FindHeliosNamedButton(names);
+            if (btn == IntPtr.Zero)
+            {
+                SetStatus("Helios " + label + " button not found.");
+                return false;
+            }
+            SendMessage(btn, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
+            SetStatus("Helios " + label + ".");
+            return true;
+        }
+
+        private bool InvokeHeliosUia(string[] automationIds, string[] names)
+        {
+            try
+            {
+                dynamic el = FindHeliosUiaElement(automationIds, names);
+                if (el == null) return false;
+                dynamic pat = el.GetCurrentPattern(UIA_InvokePatternId);
+                if (pat == null) return false;
+                pat.Invoke();
+                return true;
+            }
+            catch { }
+            return false;
+        }
+
+        private dynamic FindHeliosUiaElement(string[] automationIds, string[] names)
+        {
+            Type t = Type.GetTypeFromCLSID(CLSID_CUIAutomation);
+            if (t == null) return null;
+            dynamic uia = Activator.CreateInstance(t);
+            dynamic root = uia.ElementFromHandle(_heliosHwnd);
+            if (root == null) return null;
+            if (automationIds != null)
+            {
+                foreach (string id in automationIds)
+                {
+                    try
+                    {
+                        dynamic cond = uia.CreatePropertyCondition(UIA_AutomationIdPropertyId, id);
+                        dynamic el = root.FindFirst(TreeScope_Descendants, cond);
+                        if (el != null) return el;
+                    }
+                    catch { }
+                }
+            }
+            if (names != null)
+            {
+                foreach (string n in names)
+                {
+                    try
+                    {
+                        dynamic cond = uia.CreatePropertyCondition(UIA_NamePropertyId, n);
+                        dynamic el = root.FindFirst(TreeScope_Descendants, cond);
+                        if (el != null) return el;
+                    }
+                    catch { }
+                }
+            }
+            return null;
+        }
+
+        private IntPtr FindHeliosNamedButton(string[] names)
+        {
+            IntPtr found = IntPtr.Zero;
+            EnumChildWindows(_heliosHwnd, (h, l) =>
+            {
+                string text = GetAccName(h);
+                if (string.IsNullOrEmpty(text)) text = GetCaption(h);
+                if (string.IsNullOrEmpty(text)) return true;
+                foreach (string n in names)
+                {
+                    if (string.Equals(text.Trim(), n, StringComparison.OrdinalIgnoreCase) ||
+                        text.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        found = h;
+                        return false;
+                    }
+                }
+                return true;
+            }, IntPtr.Zero);
+            return found;
         }
 
         private static string GetCaption(IntPtr hwnd)
@@ -635,10 +973,12 @@ namespace Thetis
             return GetCaption(hwnd);
         }
 
-        private void TryReadHeliosCaptions(out string pwr, out string swr)
+        private void TryReadHeliosCaptions(out string pwr, out string swr, out string volts, out bool fanOn)
         {
             pwr = null;
             swr = null;
+            volts = GetHeliosUiaText(new[] { "voltage_label_value", "volts_text" });
+            fanOn = false;
             var kids = new List<Tuple<IntPtr, IntPtr, string, RECT>>();
             EnumChildWindows(_heliosHwnd, (h, l) =>
             {
@@ -647,6 +987,18 @@ namespace Thetis
                 kids.Add(Tuple.Create(h, GetParent(h), text, r));
                 return true;
             }, IntPtr.Zero);
+
+            foreach (var k in kids)
+            {
+                if (k.Item3.IndexOf("Fan", StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+                string t = k.Item3;
+                if (t.IndexOf("100%", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    t.IndexOf("On", StringComparison.OrdinalIgnoreCase) >= 0)
+                    fanOn = true;
+                else if (Regex.IsMatch(t, @"(?i)fan\s*[1-9]\d"))
+                    fanOn = true;
+            }
 
             foreach (var k in kids)
             {
@@ -660,6 +1012,30 @@ namespace Thetis
                         swr = s.Item3;
                         break;
                     }
+                }
+            }
+
+            if (string.IsNullOrEmpty(volts))
+            {
+                foreach (var k in kids)
+                {
+                    if (!string.Equals(k.Item3, "Volts", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(k.Item3, "Voltage", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(k.Item3, "Volts+", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    foreach (var s in kids)
+                    {
+                        if (s.Item2 != k.Item2) continue;
+                        if (!Regex.IsMatch(s.Item3, @"^\d+(\.\d+)?$")) continue;
+                        if (double.TryParse(s.Item3, System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture, out double vv) &&
+                            vv >= 5 && vv <= 80)
+                        {
+                            volts = s.Item3;
+                            break;
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(volts)) break;
                 }
             }
 
@@ -696,14 +1072,19 @@ namespace Thetis
         {
             if (!_embedded || !IsWindow(_heliosHwnd))
             {
-                SetMeterTexts("----", "--.--", Color.Gray, Color.Gray);
+                SetMeterTexts("----", "--.--", "", "--", false, Color.Gray, Color.Gray, Color.Gray);
                 return;
             }
 
-            TryReadHeliosCaptions(out string pwr, out string swr);
+            TryReadHeliosCaptions(out string pwr, out string swr, out string volts, out bool fanOn);
+            if (string.IsNullOrEmpty(volts))
+                volts = GetHeliosUiaText(new[] { "voltage_label_value", "volts_text" });
+            if (!fanOn)
+                fanOn = HeliosFanIsOn();
 
             Color pwrColor = Color.Lime;
             Color swrColor = Color.Lime;
+            Color voltsColor = Color.Lime;
             if (string.IsNullOrEmpty(pwr))
             {
                 pwr = "----";
@@ -727,15 +1108,109 @@ namespace Thetis
                 else swrColor = Color.Lime;
             }
 
-            SetMeterTexts(pwr, swr, pwrColor, swrColor);
+            if (string.IsNullOrEmpty(volts))
+            {
+                volts = "--";
+                voltsColor = Color.Gray;
+            }
+            else
+                volts = CleanVolts(volts);
+
+            string band = GetHeliosBandLabel();
+            if (IsPlaceholderBand(band)) band = "";
+
+            SetMeterTexts(pwr, swr, band, volts, fanOn, pwrColor, swrColor, voltsColor);
         }
 
-        private void SetMeterTexts(string pwr, string swr, Color pwrColor, Color swrColor)
+        private bool HeliosFanIsOn()
+        {
+            string t = GetHeliosUiaText(new[] { "Fan 100%", "Fan Auto" });
+            if (string.IsNullOrEmpty(t)) t = GetHeliosUiaText(null, new[] { "Fan 100%", "Fan Auto" });
+            if (string.IsNullOrEmpty(t)) return false;
+            if (t.IndexOf("100%", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (t.IndexOf("Off", StringComparison.OrdinalIgnoreCase) >= 0) return false;
+            if (t.IndexOf("Auto", StringComparison.OrdinalIgnoreCase) >= 0) return false;
+            return t.IndexOf("Fan", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                   Regex.IsMatch(t, @"[1-9]");
+        }
+
+        private string GetHeliosUiaText(string[] automationIds)
+        {
+            return GetHeliosUiaText(automationIds, automationIds);
+        }
+
+        private string GetHeliosUiaText(string[] automationIds, string[] names)
+        {
+            try
+            {
+                dynamic el = FindHeliosUiaElement(automationIds, names);
+                if (el == null) return null;
+                try
+                {
+                    object n = el.GetCurrentPropertyValue(UIA_NamePropertyId);
+                    string s = (n ?? "").ToString().Trim();
+                    if (!string.IsNullOrEmpty(s) &&
+                        (automationIds == null || Array.IndexOf(automationIds, s) < 0))
+                        return s;
+                    if (!string.IsNullOrEmpty(s) && s.IndexOf("Fan", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return s;
+                    if (!string.IsNullOrEmpty(s) && Regex.IsMatch(s, @"^\d"))
+                        return s;
+                }
+                catch { }
+                try
+                {
+                    dynamic val = el.GetCurrentPattern(UIA_ValuePatternId);
+                    if (val != null)
+                    {
+                        string s = Convert.ToString(val.CurrentValue);
+                        if (!string.IsNullOrEmpty(s)) return s.Trim();
+                    }
+                }
+                catch { }
+            }
+            catch { }
+            return null;
+        }
+
+        private static string CleanVolts(string volts)
+        {
+            volts = volts.Trim().TrimEnd('.');
+            if (double.TryParse(volts, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out double v))
+            {
+                if (Math.Abs(v - Math.Round(v)) < 0.05)
+                    return ((int)Math.Round(v)).ToString();
+                return v.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+            }
+            return volts;
+        }
+
+        private static bool IsPlaceholderBand(string band)
+        {
+            if (string.IsNullOrEmpty(band)) return true;
+            band = band.Trim();
+            if (band == "--" || band == "-" || band == "—") return true;
+            if (string.Equals(band, "Band", StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(band, "band_label_value", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        private void SetMeterTexts(string pwr, string swr, string band, string volts, bool fanOn,
+            Color pwrColor, Color swrColor, Color voltsColor)
         {
             if (lblPwrValue.Text != pwr) lblPwrValue.Text = pwr;
             if (lblSwrValue.Text != swr) lblSwrValue.Text = swr;
+            string bandVolts = string.IsNullOrEmpty(band) ? volts + "V" : band + "  " + volts + "V";
+            if (lblVoltsValue.Text != bandVolts) lblVoltsValue.Text = bandVolts;
             if (lblPwrValue.ForeColor != pwrColor) lblPwrValue.ForeColor = pwrColor;
             if (lblSwrValue.ForeColor != swrColor) lblSwrValue.ForeColor = swrColor;
+            if (lblVoltsValue.ForeColor != voltsColor) lblVoltsValue.ForeColor = voltsColor;
+            if (pnlFan.Visible != fanOn)
+            {
+                pnlFan.Visible = fanOn;
+                PnlMeters_Resize(pnlMeters, EventArgs.Empty);
+            }
         }
 
         private void AttachWindow(IntPtr hwnd)
