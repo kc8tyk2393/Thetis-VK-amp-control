@@ -1,0 +1,1012 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Full version number to display -->
+<?define VersionNumber="!(bind.FileVersion.ThetisEXE)" ?>
+<!-- [4.6] .NET 10 migration: app is framework-dependent (Thetis.dll + runtimeconfig.json),
+     requires the .NET 10 Desktop Runtime instead of .NET Framework 4.8.
+     Detection: filesystem search under C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App.
+     NOTE the HKLM\SOFTWARE\dotnet\Setup\...\sharedfx registry layout is NOT reliable - it is
+     only written by some installers (absent for VS/winget/zip installs). -->
+<!-- <?define NetFx481MinRelease = 533320 ?> -->
+<?define DocumentationPath = "..\..\lib\Thetis-resources\" ?>
+<?define SourcePath = "..\..\Source\" ?>
+<?define LicensesPath = "..\..\lib\licenses\" ?>
+<!-- 32-bit / 64-bit variables -->
+<?if $(var.Platform) = x64 ?>
+<?define Win64 = "yes" ?>
+<?define UpgradeCode = "159a9e90-3b5b-4501-a324-44c5b3c0df4b"?>
+<?define ProductName = "SDR-VST3 (64-bit)" ?>
+<?define ThetisName = "SDR-VST3-x64"?>
+<?define VC145 = "Microsoft_VC145_CRT_x64.msm" ?>
+<?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
+<?define FilesPath = "..\..\Bin\$(var.Platform)\$(var.Configuration)\" ?>
+<?else ?>
+<?define Win64 = "no" ?>
+<?define UpgradeCode = "3efd9e6a-b229-4806-8d98-301ca668da8f"?>
+<?define ProductName = "SDR-VST3 (32-bit)" ?>
+<?define ThetisName = "SDR-VST3"?>
+<?define VC145 = "Microsoft_VC145_CRT_x86.msm" ?>
+<?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
+<?define FilesPath = "..\..\Bin\$(var.Platform)\$(var.Configuration)\" ?>
+<?endif ?>
+<?define LspPath = "..\..\lib\lsp\" ?>
+
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+      xmlns:fire="http://schemas.microsoft.com/wix/FirewallExtension">
+
+  <Product Id="*"
+           Name="$(var.ProductName)"
+           Language="!(loc.Language)"
+           Version="$(var.VersionNumber)"
+           Manufacturer="!(loc.ManufacturerName)"
+           UpgradeCode="$(var.UpgradeCode)">
+    <Package Id="*"
+             InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perMachine"
+             Description="!(loc.ProductDescription)"
+             Comments="!(loc.Comments) $(var.VersionNumber)"/>
+
+    <!-- Upgrade logic -->
+    <!-- AllowSameVersionUpgrades -> Always upgrade, never allow two versions to be installed next to each other -->
+    <!-- AllowSameVersionUpgrades causes ICE61 which must be ignored -->
+	<!-- [2.10.2] MW0LGE -->
+	<!-- afterInstallExecute changed to afterInstallValidate which removes any installed version before installing -->
+	<!-- downside is that if install fails you wont have old version either -->
+    <MajorUpgrade Schedule="afterInstallValidate" 
+                  DowngradeErrorMessage="!(loc.NewerInstalled)"
+                  AllowSameVersionUpgrades="yes" />
+    
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- [4.6] .NET 10 Desktop Runtime (x64) launch condition.
+         Searches one level deep under the shared-framework store for
+         PresentationCore.dll with version >= 10.0.0. Every WindowsDesktop App
+         band ships it and its file version tracks the runtime version
+         (e.g. 10.0.10 -> 10.0.1026.x), so 8.x/9.x installs are rejected and
+         any future 10.x/11.x passes. -->
+    <Property Id="DOTNETDESKTOP_10" Secure="yes">
+      <DirectorySearch Id="DotNetDesktopAppDir"
+                       Path="[ProgramFiles64Folder]dotnet\shared\Microsoft.WindowsDesktop.App"
+                       Depth="1">
+        <FileSearch Name="PresentationCore.dll"
+                    MinVersion="10.0.0" />
+      </DirectorySearch>
+    </Property>
+    <Condition Message="[ProductName] Requires the .NET 10 Desktop Runtime for x64 to be installed. Please install it from https://dotnet.microsoft.com/download/dotnet/10.0 then run this installer again.">
+      <![CDATA[Installed OR DOTNETDESKTOP_10]]>
+    </Condition>
+
+    <WixVariable Id="WixUILicenseRtf" Value="GNU_GENERAL_PUBLIC_LICENSE.rtf" />
+
+    <Feature Id="ProductFeature" Title="SDR-VST3" Level="1" ConfigurableDirectory="INSTALLFOLDER">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="LspComponents" />
+      <ComponentGroupRef Id="SDRVST3SkinComponents" />
+      <ComponentGroupRef Id="RuntimeAssets" />
+      <ComponentGroupRef Id="LicensesComponents" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+    <!-- [4.6] rid-specific assets the host pins via deps.json runtimeTargets; resolved
+         ONLY from the runtimes subtree (no root fallback). SkiaSharp pdb intentionally
+         omitted (83 MB debug symbols, not needed at runtime). -->
+    <ComponentGroup Id="RuntimeAssets">
+      <Component Id="SysIOPortsRidCmp" Guid="*" Directory="RtNet9Dir">
+        <File Id="SysIOPortsRid"
+              Source="$(var.FilesPath)runtimes\win\lib\net9.0\System.IO.Ports.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Id="SysMgmtRidCmp" Guid="*" Directory="RtNet10Dir">
+        <File Id="SysMgmtRid"
+              Source="$(var.FilesPath)runtimes\win\lib\net10.0\System.Management.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Id="SvcCtrlRidCmp" Guid="*" Directory="RtNetStd20Dir">
+        <File Id="SvcCtrlRid"
+              Source="$(var.FilesPath)runtimes\win\lib\netstandard2.0\System.ServiceProcess.ServiceController.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Id="LibSkiaSharpX64Cmp" Guid="*" Directory="RtNativeDir">
+        <File Id="LibSkiaSharpX64"
+              Source="$(var.FilesPath)runtimes\win-x64\native\libSkiaSharp.dll"
+              KeyPath="yes"
+              />
+      </Component>
+    </ComponentGroup>
+
+    <!-- [4.6] third-party license texts shipped with every install (see lib\licenses) -->
+    <ComponentGroup Id="LicensesComponents">
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicNotices" Source="$(var.LicensesPath)NOTICES.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicVortice" Source="$(var.LicensesPath)LICENSE-Vortice.Windows.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicSharpGen" Source="$(var.LicensesPath)LICENSE-SharpGenTools.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicSkiaSharp" Source="$(var.LicensesPath)LICENSE-SkiaSharp.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicNAudio" Source="$(var.LicensesPath)LICENSE-NAudio.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicDiscordNet" Source="$(var.LicensesPath)LICENSE-Discord.Net.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicHtmlAgilityPack" Source="$(var.LicensesPath)LICENSE-HtmlAgilityPack.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicMarkdig" Source="$(var.LicensesPath)LICENSE-Markdig.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicNewtonsoft" Source="$(var.LicensesPath)LICENSE-Newtonsoft.Json.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicFirewallHelper" Source="$(var.LicensesPath)LICENSE-WindowsFirewallHelper.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicExCSS" Source="$(var.LicensesPath)LICENSE-ExCSS.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicSvg" Source="$(var.LicensesPath)LICENSE-Svg.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicRNNoise" Source="$(var.LicensesPath)LICENSE-RNNoise.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicFFTW" Source="$(var.LicensesPath)LICENSE-FFTW.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicDotNetLibs" Source="$(var.LicensesPath)LICENSE-DotNetLibraries.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="NoticeFTDI" Source="$(var.LicensesPath)NOTICE-FTDI2XX.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicPortAudio" Source="$(var.LicensesPath)LICENSE-PortAudio.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicSpecbleach" Source="$(var.LicensesPath)LICENSE-libspecbleach.txt" KeyPath="yes"/></Component>
+    </ComponentGroup>
+
+    <Feature Id="VC145Redist" Title="Visual C++ 14.5 Runtime" AllowAdvertise="no" Display="hidden" Level="1">
+      <MergeRef Id="VC145Redist"/>
+    </Feature>
+
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <UIRef Id="WixUI_Mondo" />
+
+    <!-- UI customization -->
+    <WixVariable Id="WixUIBannerBmp" Value="binary/thetis_banner.bmp"/>
+    <WixVariable Id="WixUIDialogBmp" Value="binary/thetis_background.bmp"/>
+
+    <!-- Define icons (ID should not be longer than 18 chars") -->
+    <Icon Id="icon.ico" SourceFile="binary/Thetis.ico" />
+    <Property Id="ARPPRODUCTICON" Value="icon.ico" />
+    <Property Id="ARPNOMODIFY" Value="yes" Secure="yes" />
+ 
+    <!-- 
+         Launch conditions
+         
+            Check minimum OS version 
+            If not, the installation is aborted.
+            By doing the (Installed OR ...) property means that this condition will only be evaluated if the app is being installed and not on uninstall or changing
+         
+            Note: Under a Product element, a condition becomes a LaunchCondition entry. 
+      -->
+    <Condition Message="!(loc.OS2Old)">
+      <![CDATA[Installed OR (VersionNT >= 601)]]>
+    </Condition>
+
+    <?if $(var.Platform) = x64 ?>
+    <Condition Message="!(loc.x86VersionRequired)">
+      <![CDATA[VersionNT64]]>
+    </Condition>
+    <?endif?>
+    
+  </Product>
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Merge Id="VC145Redist" SourceFile="$(var.VC145)" DiskId="1" Language="0"/>
+
+      <Directory Id="$(var.PlatformProgramFilesFolder)">
+        <Directory Id="HPSDRFolder" Name="OpenHPSDR">
+          <Directory Id="INSTALLFOLDER" Name="SDR-VST3">
+            <!-- [4.6] rid-specific subtree pinned by Thetis.deps.json runtimeTargets;
+                 the host resolves these ONLY from here (no root fallback) -->
+            <Directory Id="RuntimesDir" Name="runtimes">
+              <Directory Id="RtWinDir" Name="win">
+                <Directory Id="RtWinLibDir" Name="lib">
+                  <Directory Id="RtNet9Dir" Name="net9.0"/>
+                  <Directory Id="RtNet10Dir" Name="net10.0"/>
+                  <Directory Id="RtNetStd20Dir" Name="netstandard2.0"/>
+                </Directory>
+              </Directory>
+              <Directory Id="RtWinX64Dir" Name="win-x64">
+                <Directory Id="RtNativeDir" Name="native"/>
+              </Directory>
+            </Directory>
+            <Directory Id="LicensesDir" Name="Licenses"/>
+		  </Directory>
+        </Directory>
+      </Directory>
+
+      <?if $(var.Platform) = x64 ?>
+      <Directory Id="CommonFiles64Folder">
+        <Directory Id="VST3Folder" Name="VST3">
+        </Directory>
+      </Directory>
+      <?else ?>
+      <Directory Id="CommonFilesFolder">
+        <Directory Id="VST3Folder" Name="VST3">
+        </Directory>
+      </Directory>
+      <?endif ?>
+
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="OpenHPSDRShortcutsDir" Name="OpenHPSDR">
+          <Directory Id="ShortcutsDir" Name="$(var.ThetisName)">           
+          </Directory>
+        </Directory>
+      </Directory>
+
+      <Directory Id="DesktopFolder">
+      </Directory>
+
+      <Directory Id="AppDataFolder">
+      </Directory>
+      
+    </Directory>
+  </Fragment>
+
+  <Fragment>
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="6A395378-66D6-4986-97C6-8CF9423A066C">       
+        <Shortcut Id="ProgramDesktopShortcut"
+                  Name="Thetis VK amp control"
+                  Description="Run Thetis VK amp control"
+                  Target="[INSTALLFOLDER]Thetis.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKLM" Key="Software\OpenHPSDR\$(var.ThetisName)"
+                Name="desktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="ShortcutsDir">
+      <Component Id="StartMenuShortcut">
+              
+        <Shortcut Id="ThetisShortcut"
+                  Name="Thetis VK amp control"
+                  Description="Run Thetis VK amp control"
+                  Target="[INSTALLFOLDER]Thetis.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  />
+        <RemoveFolder Id="RemoveShortcutsDir" On="uninstall" />
+        
+        <RegistryValue Root="HKLM"
+                     Key="SOFTWARE\OpenHPSDR\$(var.ThetisName)"
+                     Name="installed"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+
+        <Shortcut Id="ThetisManualShortcut"
+                      Name="ThetisManual"
+                      Description="Open Thetis Manual"
+                      Target="[INSTALLFOLDER]Thetis manual.pdf"
+                      WorkingDirectory="INSTALLFOLDER" />
+
+        <Shortcut Id="MIDI2CATManualShortcut"
+                Name="Midi2CatManual"
+                Description="Open Midi2Cat Manual"
+                Target="[INSTALLFOLDER]Midi2Cat_Instructions_V3.pdf"
+                WorkingDirectory="INSTALLFOLDER" />
+
+        <Shortcut Id="PureSignalManualShortcut"
+         Name="PureSignalManual"
+         Description="Open PureSignal Manual"
+         Target="[INSTALLFOLDER]PureSignal.pdf"
+         WorkingDirectory="INSTALLFOLDER" />
+
+        <Shortcut Id="BehringerModsShortcut"
+          Name="BehringerMods-Midi2Cat"
+          Description="Open Behringer-Midi2Cat Mods"
+          Target="[INSTALLFOLDER]BehringerMods_Midi2Cat_v2.pdf"
+          WorkingDirectory="INSTALLFOLDER" />
+
+        <Shortcut Id="CATCommandRefShortcut"
+         Name="CATCommandRef"
+         Description="Open CAT-Command Ref"
+         Target="[INSTALLFOLDER]Thetis-CAT-Command-Reference-Guide-V3.pdf"
+         WorkingDirectory="INSTALLFOLDER" />
+
+		<Shortcut Id="cmASIOGuideShortcut"
+        Name="cmASIOGuide"
+        Description="ChannelMaster ASIO Guide"
+        Target="[INSTALLFOLDER]cmASIO Guide.pdf"
+        WorkingDirectory="INSTALLFOLDER" />
+
+        <Shortcut Id="APFtypesShortcut"
+        Name="APFtypes"
+        Description="New Audio Peaking Filter Types"
+        Target="[INSTALLFOLDER]APFtypes.pdf"
+        WorkingDirectory="INSTALLFOLDER" />
+
+		<Shortcut Id="NetworkSettingsShortcut"
+        Name="NetworkSettings"
+        Description="Network Settings Guide"
+        Target="[INSTALLFOLDER]Thetis Network Settings_0.2.pdf"
+        WorkingDirectory="INSTALLFOLDER" />
+		  
+	  </Component>
+    </DirectoryRef>
+	  
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      
+      <Component Id="fwException" Guid="*" Transitive="yes">
+        <Condition>Privileged</Condition>
+        <File Id="ThetisEXE"
+              Source="$(var.FilesPath)Thetis.exe"
+              KeyPath="yes">
+
+			<fire:FirewallException Id="thetis_$(var.Platform)_tcp"
+                      Name="$(var.ThetisName) (TCP In)"
+                      Description="TCP In-bound Firewall rule for OpenHPSDR SDRs running SDR-VST3"
+                      Protocol="tcp"
+                      Scope="any"
+                      IgnoreFailure="no"
+                      Profile="all" />
+			
+			<fire:FirewallException Id="thetis_$(var.Platform)_udp"
+                      Name="$(var.ThetisName) (UDP In)"
+                      Description="UDP In-bound Firewall rule for OpenHPSDR SDRs running SDR-VST3"
+                      Protocol="udp"
+                      Scope="any"
+                      IgnoreFailure="no"
+                      Profile="all" />
+        </File>
+      </Component>
+
+	  <!-- [2.10.3.11]MW0LGE add checksum to some files that do not always have a version number or a version
+	  number update, but do have content or code changes from time to time. Using the timestamp is not always reliable. -->
+
+      <!-- [4.6] .NET 10 framework-dependent deployment payload: the managed entry
+           assembly plus the files the host uses to resolve it -->
+      <Component Guid="*">
+        <File Id="ThetisManagedDLL"
+              Source="$(var.FilesPath)Thetis.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="ThetisDepsJson"
+              Source="$(var.FilesPath)Thetis.deps.json"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="ThetisRuntimeConfigJson"
+              Source="$(var.FilesPath)Thetis.runtimeconfig.json"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+
+
+      <!-- [4.6] Vortice DirectX bindings + SharpGen base runtime (SharpDX successors,
+           used by the GPU mesh display paths) -->
+      <Component Guid="*">
+        <File Id="VorticeDirect2D1DLL"
+              Source="$(var.FilesPath)Vortice.Direct2D1.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="VorticeDirect3D11DLL"
+              Source="$(var.FilesPath)Vortice.Direct3D11.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="VorticeD3DCompilerDLL"
+              Source="$(var.FilesPath)Vortice.D3DCompiler.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="VorticeDXGIDLL"
+              Source="$(var.FilesPath)Vortice.DXGI.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="VorticeDirectXDLL"
+              Source="$(var.FilesPath)Vortice.DirectX.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="VorticeMathematicsDLL"
+              Source="$(var.FilesPath)Vortice.Mathematics.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="SharpGenRuntimeDLL"
+              Source="$(var.FilesPath)SharpGen.Runtime.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="SharpGenRuntimeCOMDLL"
+              Source="$(var.FilesPath)SharpGen.Runtime.COM.dll"
+              KeyPath="yes"
+              />
+      </Component>
+
+      <!-- [4.6] WinForms.DataVisualization port (chart controls) -->
+      <Component Guid="*">
+        <File Id="WinFormsDataVisualizationDLL"
+              Source="$(var.FilesPath)WinForms.DataVisualization.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="WinFormsDataVisualizationUtilitiesDLL"
+              Source="$(var.FilesPath)WinForms.DataVisualization.Utilities.dll"
+              KeyPath="yes"
+              />
+      </Component>
+
+      <!-- [4.6] additional BCL packages pulled in by .NET 10 -->
+      <Component Guid="*">
+        <File Id="SystemComponentModelCompositionDLL"
+              Source="$(var.FilesPath)System.ComponentModel.Composition.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="SystemIOPortsDLL"
+              Source="$(var.FilesPath)System.IO.Ports.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="SystemManagementDLL"
+              Source="$(var.FilesPath)System.Management.dll"
+              KeyPath="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="SystemServiceProcessServiceControllerDLL"
+              Source="$(var.FilesPath)System.ServiceProcess.ServiceController.dll"
+              KeyPath="yes"
+              />
+      </Component>
+
+      <!-- [4.6] VstPluginScanner managed payload (exe component already exists below) -->
+      <Component Guid="*">
+        <File Id="VstPluginScannerDLL"
+              Source="$(var.FilesPath)VstPluginScanner.dll"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="VstPluginScannerDepsJson"
+              Source="$(var.FilesPath)VstPluginScanner.deps.json"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+      <Component Guid="*">
+        <File Id="VstPluginScannerRuntimeConfigJson"
+              Source="$(var.FilesPath)VstPluginScanner.runtimeconfig.json"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+
+      <Component Guid="*">
+        <File Id="CATStructsXML"
+              Source="$(var.FilesPath)CATStructs.xml"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+
+      <Component Guid="*">
+        <File Id="CourtesyToneDefaultWav"
+              Source="$(var.FilesPath)courtesy_tone_default.wav"
+              KeyPath="yes"
+              Checksum="yes"
+              />
+      </Component>
+
+		<Component Guid="*">
+        <File Id="wdspDLL"
+              Source="$(var.FilesPath)wdsp.dll"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+
+      <Component Guid="*">
+        <File Id="LibFFTW33DLL"
+              Source="$(var.FilesPath)libfftw3-3.dll"
+              KeyPath="yes"
+              />
+      </Component>
+		<Component Guid="*">
+			<File Id="LibFFTWF33DLL"
+				  Source="$(var.FilesPath)libfftw3f-3.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+
+		<Component Guid="*">
+			<File Id="rnnoiseDLL"
+				  Source="$(var.FilesPath)rnnoise.dll"
+				  KeyPath="yes"
+				  Checksum="yes"
+              />
+		</Component>
+
+		<Component Guid="*">
+			<File Id="rnnoise_avx2DLL"
+				  Source="$(var.FilesPath)rnnoise_avx2.dll"
+				  KeyPath="yes"
+				  Checksum="yes"
+              />
+		</Component>
+		
+		<Component Guid="*">
+			<File Id="specbleachDLL"
+				  Source="$(var.FilesPath)specbleach.dll"
+				  KeyPath="yes"
+				  Checksum="yes"
+              />
+		</Component>
+
+      <Component Guid="*">
+        <File Id="PA19DLL"
+              Source="$(var.FilesPath)PA19.dll"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+
+      <Component Guid="*">
+        <File Id="ChannelMasterDLL"
+              Source="$(var.FilesPath)ChannelMaster.dll"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+
+      <Component Guid="*">
+        <File Id="cmASIODLL"
+              Source="$(var.FilesPath)cmASIO.dll"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+
+      <Component Guid="*">
+        <File Id="VstHostBridgeDLL"
+              Source="$(var.FilesPath)VstHostBridge.dll"
+              KeyPath="yes"
+              Checksum="yes"
+              />
+      </Component>
+
+      <Component Guid="*">
+        <File Id="VstAudioHostEXE"
+              Source="$(var.FilesPath)VstAudioHost.exe"
+              KeyPath="yes"
+              Checksum="yes"
+              />
+      </Component>
+
+      <Component Guid="*">
+        <File Id="VstPluginScannerEXE"
+              Source="$(var.FilesPath)VstPluginScanner.exe"
+              KeyPath="yes"
+              Checksum="yes"
+              />
+      </Component>
+
+	<Component Guid="*">
+		<File Id="libSkiaSharpDLL"
+				Source="$(var.FilesPath)libSkiaSharp.dll"
+				KeyPath="yes"
+            />
+	</Component>
+		
+		<!-- not used as baked into wdsp. Note: the post compile copy has the zetaHat.bin file copy commented with ::
+      <Component Guid="*">
+        <File Id="zetaHat.bin"
+              Source="$(var.FilesPath)zetaHat.bin"
+              KeyPath="yes"
+              />
+      </Component>
+        -->
+
+		<!-- rnnoise weights model binary files -->
+		<Component Guid="*">
+			<File Id="rnnoise_weights_small.bin"
+				  Source="$(var.FilesPath)rnnoise_weights_small.bin"
+				  KeyPath="yes"
+				  Checksum="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="rnnoise_weights_large.bin"
+				  Source="$(var.FilesPath)rnnoise_weights_large.bin"
+				  KeyPath="yes"
+				  Checksum="yes"
+              />
+		</Component>
+		
+      <Component Guid="*">
+        <File Id="Midi2CatDLL"
+              Source="$(var.FilesPath)Midi2Cat.dll"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+
+      <Component Guid="*">
+        <File Id="RawInputDLL"
+              Source="$(var.FilesPath)RawInput.dll"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+
+		<!-- [4.7] System.Buffers, SharpDX.Desktop removed: inbox / replaced by Vortice -->
+
+		<Component Guid="*">
+			<File Id="Newtonsoft.JsonDLL"
+				  Source="$(var.FilesPath)Newtonsoft.Json.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+
+		<Component Guid="*">
+			<File Id="MarkdigDLL"
+				  Source="$(var.FilesPath)Markdig.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+
+		<!-- 
+		NAudio
+		-->
+		<Component Guid="*">
+			<File Id="NAudio"
+				  Source="$(var.FilesPath)NAudio.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="NAudio.Asio"
+				  Source="$(var.FilesPath)NAudio.Asio.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="NAudio.Core"
+				  Source="$(var.FilesPath)NAudio.Core.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="NAudio.Midi"
+				  Source="$(var.FilesPath)NAudio.Midi.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="NAudio.Wasapi"
+				  Source="$(var.FilesPath)NAudio.Wasapi.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="NAudio.WinForms"
+				  Source="$(var.FilesPath)NAudio.WinForms.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="NAudio.WinMM"
+				  Source="$(var.FilesPath)NAudio.WinMM.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<!-- 
+		NAudio end
+		-->
+		
+		<!-- 
+		Additional
+		-->
+		<!-- [4.7] System.Numerics.Vectors, System.Runtime.CompilerServices.Unsafe,
+		     System.Text.Encoding.CodePages, System.Threading.Tasks.Extensions,
+		     System.Drawing.Common removed: inbox in .NET 10 -->
+		<Component Guid="*">
+			<File Id="HtmlAgilityPackDLL"
+				  Source="$(var.FilesPath)HtmlAgilityPack.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="SkiaSharpDLL"
+				  Source="$(var.FilesPath)SkiaSharp.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="ExCSSDLL"
+				  Source="$(var.FilesPath)ExCSS.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="SvgDLL"
+				  Source="$(var.FilesPath)Svg.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<!-- 
+		Additional end
+		-->
+
+		<!-- 
+		Binding Redirects / runtime config. [4.6] .NET 10 migration: the config file
+		is now emitted next to the managed assembly as Thetis.dll.config (there is no
+		native Thetis.exe.config anymore). Checksummed so it always installs if changed.
+		-->
+		<Component Guid="*">
+			<File Id="Thetis.dll.config"
+				  Source="$(var.FilesPath)Thetis.dll.config"
+				  KeyPath="yes"
+				  Checksum="yes"
+              />
+		</Component>
+		<!-- 
+		End Thetis.exe.config
+		-->
+		
+		<!-- 
+		CodeAnalysis for Led/MultiMeter
+		-->
+		<Component Guid="*">
+			<File Id="Microsoft.CodeAnalysisDLL"
+				  Source="$(var.FilesPath)Microsoft.CodeAnalysis.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="Microsoft.CodeAnalysis.CSharpDLL"
+				  Source="$(var.FilesPath)Microsoft.CodeAnalysis.CSharp.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="Microsoft.CodeAnalysis.CSharp.Scripting"
+				  Source="$(var.FilesPath)Microsoft.CodeAnalysis.CSharp.Scripting.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="Microsoft.CodeAnalysis.ScriptingDLL"
+				  Source="$(var.FilesPath)Microsoft.CodeAnalysis.Scripting.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<!-- [4.7] System.Collections.Immutable, System.Reflection.Metadata removed: inbox in .NET 10 -->
+		<!-- 
+		End CodeAnalysis for Led/MultiMeter section
+		-->
+
+		<!-- 
+		Discord
+		-->
+		<Component Guid="*">
+			<File Id="Discord.Net.CommandsDLL"
+				  Source="$(var.FilesPath)Discord.Net.Commands.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="Discord.Net.CoreDLL"
+				  Source="$(var.FilesPath)Discord.Net.Core.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="Discord.Net.InteractionsDLL"
+				  Source="$(var.FilesPath)Discord.Net.Interactions.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="Discord.Net.RestDLL"
+				  Source="$(var.FilesPath)Discord.Net.Rest.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="Discord.Net.WebhookDLL"
+				  Source="$(var.FilesPath)Discord.Net.Webhook.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="Discord.Net.WebSocketDLL"
+				  Source="$(var.FilesPath)Discord.Net.WebSocket.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="Microsoft.Extensions.DependencyInjection.AbstractionsDLL"
+				  Source="$(var.FilesPath)Microsoft.Extensions.DependencyInjection.Abstractions.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<!-- [4.7] System.CodeDom removed: inbox in .NET 10 -->
+		<Component Guid="*">
+			<File Id="System.Interactive.AsyncDLL"
+				  Source="$(var.FilesPath)System.Interactive.Async.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="System.Linq.AsyncDLL"
+				  Source="$(var.FilesPath)System.Linq.Async.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<Component Guid="*">
+			<File Id="System.ReactiveDLL"
+				  Source="$(var.FilesPath)System.Reactive.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<!-- 
+		End Discord
+		-->
+		
+		<!-- [4.7] Legacy .NET Framework polyfills removed: inbox in .NET 10 -->
+		<Component Guid="*">
+			<File Id="MicrosoftNETStringToolsDLL"
+				  Source="$(var.FilesPath)Microsoft.NET.StringTools.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+		<!-- [4.7] System.Formats.Nrbf, System.Linq.AsyncEnumerable removed: inbox in .NET 10 -->
+		<!-- [4.7] System.Resources.Extensions removed: inbox in .NET 10 -->
+		
+		<!-- [4.7] SharpDX removed: replaced by Vortice.Windows -->
+		<Component Guid="*">
+			<File Id="WindowsFirewallHelperDLL"
+				  Source="$(var.FilesPath)WindowsFirewallHelper.dll"
+				  KeyPath="yes"
+              />
+		</Component>
+      <Component Guid="*">
+        <File Id="FTDI2xxDLL"
+            Source="$(var.FilesPath)FTDI2XX.dll"
+            KeyPath="yes"
+              />
+      </Component>
+		
+      <Component Guid="*">
+        <File Id="PureSignalPDF"
+              Source="$(var.DocumentationPath)PureSignal.pdf"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+
+      <Component Guid="*">
+        <File Id="ThetisManualPDF"
+              Source="$(var.DocumentationPath)Thetis manual.pdf"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+
+      <Component Guid="*">
+        <File Id="Midi2Cat_Instructions_V3PDF"
+              Source="$(var.DocumentationPath)Midi2Cat_Instructions_V3.pdf"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+
+      <Component Guid="*">
+        <File Id="BehringerMods_Midi2Cat__V2PDF"
+              Source="$(var.DocumentationPath)BehringerMods_Midi2Cat_v2.pdf"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+      </Component>
+
+      <Component Guid="*">
+        <File Id="ThetisCATCommandReferenceGuideV3PDF"
+              Source="$(var.DocumentationPath)Thetis-CAT-Command-Reference-Guide-V3.pdf"
+              KeyPath="yes"
+			  Checksum="yes"
+              />
+	  </Component>
+		<Component Guid="*">
+			<File Id="ThetisReleaseNotesTXT"
+				Source="$(var.SourcePath)ReleaseNotes.txt"
+				KeyPath="yes"
+				Checksum="yes"
+            />			  
+		  </Component>
+		<Component Guid="*">
+			<File Id="cmASIOGuidePDF"
+				Source="$(var.DocumentationPath)cmASIO Guide.pdf"
+				KeyPath="yes"
+				Checksum="yes"
+            />
+		</Component>
+		<Component Guid="*">
+			<File Id="APFtypesPDF"
+				Source="$(var.DocumentationPath)APFtypes.pdf"
+				KeyPath="yes"
+				Checksum="yes"
+            />
+		</Component>
+		<Component Guid="*">
+			<File Id="NetworkSettingsPDF"
+				Source="$(var.DocumentationPath)Thetis Network Settings_0.2.pdf"
+				KeyPath="yes"
+				Checksum="yes"
+            />
+		</Component>
+	</ComponentGroup>
+
+	<!-- LSP VST3 plugin suite installed to Common Files\VST3.
+	     Components are Permanent so uninstalling Thetis does not remove plugin
+	     files that other VST3 hosts may also use. -->
+    <ComponentGroup Id="LspComponents" Directory="VST3Folder">
+      <Component Id="LspPluginsVST3" Guid="*" Permanent="yes">
+        <File Id="LspPluginsVST3File"
+              Source="$(var.LspPath)lsp-plugins.vst3"
+              KeyPath="yes"
+              Checksum="yes" />
+      </Component>
+      <Component Id="LspLibwinpthreadDLL" Guid="*" Permanent="yes">
+        <File Id="LspLibwinpthreadDLLFile"
+              Source="$(var.LspPath)libwinpthread-1.dll"
+              KeyPath="yes"
+              Checksum="yes" />
+      </Component>
+      <Component Id="LspR3dWglLibDLL" Guid="*" Permanent="yes">
+        <File Id="LspR3dWglLibDLLFile"
+              Source="$(var.LspPath)lsp-r3d-wgl-lib.dll"
+              KeyPath="yes"
+              Checksum="yes" />
+      </Component>
+      <Component Id="LspAttribution" Guid="*" Permanent="yes">
+        <File Id="LspAttributionTXT"
+              Source="$(var.LspPath)ATTRIBUTION.txt"
+              KeyPath="yes" />
+      </Component>
+      <Component Id="LspLicenseLgpl" Guid="*" Permanent="yes">
+        <File Id="LspLicenseLgplTXT"
+              Source="$(var.LspPath)LICENSE-LGPL-3.0.txt"
+              KeyPath="yes" />
+      </Component>
+      <Component Id="LspLicenseWinpthread" Guid="*" Permanent="yes">
+        <File Id="LspLicenseWinpthreadTXT"
+              Source="$(var.LspPath)LICENSE-libwinpthread.txt"
+              KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Binary Id="InstallSkins" SourceFile="OpenHPSDR_Skins.exe" />
+    <CustomAction Id="InstallSkins_CA" BinaryKey="InstallSkins"
+        Impersonate="yes" Execute="deferred" ExeCommand="[SystemFolder]cmd.exe /C start OpenHPSDR_Skins.exe &amp; exit"
+                  Return="check"/>
+
+	  <Binary Id="InstallMeterSkins" SourceFile="MeterSkinInstaller.exe" />
+	  <CustomAction Id="InstallMeterSkins_CA" BinaryKey="InstallMeterSkins"
+		  Impersonate="yes" Execute="deferred" ExeCommand="[SystemFolder]cmd.exe /C start MeterSkinInstaller.exe"
+					Return="check"/>
+
+    <InstallExecuteSequence>
+      <Custom Action='InstallSkins_CA' Before='InstallFinalize'>
+        NOT Installed
+      </Custom>
+    </InstallExecuteSequence>
+
+	  <InstallExecuteSequence>
+		  <Custom Action='InstallMeterSkins_CA' Before='InstallFinalize'>
+			  NOT Installed
+		  </Custom>
+	  </InstallExecuteSequence>
+	  
+    <!--   -->
+  </Fragment>
+
+</Wix>
