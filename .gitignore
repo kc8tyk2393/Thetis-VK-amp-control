@@ -430,5 +430,7 @@ FREEDV_HANDOFF.md
 # Local secrets and generated installers — never commit
 discord.json
 /Thetis VK amp control Setup.exe
+# fldigi/WSJT-X sidecar binaries (~240MB); local WiX harvests them when present
+/payload/
 Project Files/lib/vst3sdk/doc/
 

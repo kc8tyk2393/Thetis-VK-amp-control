@@ -84,6 +84,9 @@
   <ItemGroup>
     <EmbeddedResource Include="Thetis_en-us.wxl" />
   </ItemGroup>
+  <PropertyGroup Condition="Exists('$(MSBuildThisFileDirectory)..\..\..\payload\Fldigi\fldigi.exe')">
+    <DefineConstants>$(DefineConstants);INCLUDE_DIGI_SIDECARS</DefineConstants>
+  </PropertyGroup>
   <Import Project="$(WixTargetsPath)" />
   <!--
 	To modify your build process, add your task inside one of the targets below and uncomment it.

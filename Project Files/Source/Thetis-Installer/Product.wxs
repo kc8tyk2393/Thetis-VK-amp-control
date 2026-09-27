@@ -29,8 +29,10 @@
 <?define FilesPath = "..\..\Bin\$(var.Platform)\$(var.Configuration)\" ?>
 <?endif ?>
 <?define LspPath = "..\..\lib\lsp\" ?>
+<?ifdef INCLUDE_DIGI_SIDECARS ?>
 <?define FldigiPath = "..\..\..\payload\Fldigi\" ?>
 <?define WsjtXPath = "..\..\..\payload\WsjtX\" ?>
+<?endif ?>
 
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
       xmlns:fire="http://schemas.microsoft.com/wix/FirewallExtension">
@@ -82,8 +84,10 @@
 
     <Feature Id="ProductFeature" Title="SDR-VST3" Level="1" ConfigurableDirectory="INSTALLFOLDER">
       <ComponentGroupRef Id="ProductComponents" />
+<?ifdef INCLUDE_DIGI_SIDECARS ?>
       <ComponentGroupRef Id="FldigiComponents" />
       <ComponentGroupRef Id="WsjtXComponents" />
+<?endif ?>
       <ComponentGroupRef Id="LspComponents" />
       <ComponentGroupRef Id="SDRVST3SkinComponents" />
       <ComponentGroupRef Id="HfgcsComponents" />
@@ -979,7 +983,9 @@
 	<!-- fldigi sidecar payload: prebuilt exe + runtime DLLs shipped from the
 	     git-tracked payload\Fldigi folder.  Installed to [INSTALLFOLDER]\Fldigi
 	     so FldigiManager.ResolveExecutable() resolves them as the primary probe.
-	     Refresh payload\Fldigi on every fldigi rebuild. -->
+	     Refresh payload\Fldigi on every fldigi rebuild. GitHub installer omits
+	     this unless payload\Fldigi is present (INCLUDE_DIGI_SIDECARS). -->
+<?ifdef INCLUDE_DIGI_SIDECARS ?>
 	<ComponentGroup Id="FldigiComponents" Directory="FldigiDir">
 		<Component Guid="*"><File Id="FldigiEXE" Source="$(var.FldigiPath)fldigi.exe" KeyPath="yes" Checksum="yes"/></Component>
 		<Component Guid="*"><File Id="FldigiLibFLAC" Source="$(var.FldigiPath)libFLAC.dll" KeyPath="yes" Checksum="yes"/></Component>
@@ -1005,6 +1011,7 @@
 		<Component Guid="*"><File Id="FldigiLibwinpthread1" Source="$(var.FldigiPath)libwinpthread-1.dll" KeyPath="yes" Checksum="yes"/></Component>
 		<Component Guid="*"><File Id="FldigiZlib1" Source="$(var.FldigiPath)zlib1.dll" KeyPath="yes" Checksum="yes"/></Component>
 	</ComponentGroup>
+<?endif ?>
 
 	<!-- LSP VST3 plugin suite installed to Common Files\VST3.
 	     Components are Permanent so uninstalling Thetis does not remove plugin
@@ -1071,9 +1078,8 @@
   </Fragment>
 
   <!-- wsjtx sidecar payload: prebuilt exe + runtime DLLs + Qt plugins shipped
-       from the git-tracked payload\WsjtX folder.  Installed to
-       [INSTALLFOLDER]\WsjtX so WsjtManager.ResolveExecutable() resolves them as
-       the primary probe.  Refresh payload\WsjtX on every wsjtx rebuild. -->
+       from payload\WsjtX when INCLUDE_DIGI_SIDECARS is set. -->
+<?ifdef INCLUDE_DIGI_SIDECARS ?>
   <Fragment>
     <DirectoryRef Id="WsjtXDir">
       <Directory Id="WsjtXPluginsDir" Name="plugins">
@@ -1154,5 +1160,6 @@
         <Component Guid="*" Directory="WsjtXPluginsStylesDir"><File Id="WsjtXStylesqwindowsvistastyle_dllF" Source="$(var.WsjtXPath)plugins\styles\qwindowsvistastyle.dll" KeyPath="yes" Checksum="yes"/></Component>
     </ComponentGroup>
   </Fragment>
+<?endif ?>
 
 </Wix>
