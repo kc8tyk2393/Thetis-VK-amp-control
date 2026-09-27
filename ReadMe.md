@@ -26,6 +26,9 @@ Special Thanks to chasingcoffee his hard work is what made this vst version poss
 Forked from his original at his github page 
 https://github.com/ChasingCoffee/Thetis/tree/vst-support
 
+Special Thanks to nubbyless as a contributor for SDR-VST3
+https://github.com/nubbyless/SDR-VST3
+
 
 Credits — RADE / FreeDV digital voice
 The RADE (Radio AutoEncoder) digital-voice modem and FreeDV integration was ported from Christos Nikolaou's (SV1EIA) Thetis-RADE fork:
