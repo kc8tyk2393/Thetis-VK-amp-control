@@ -232,7 +232,10 @@ namespace Thetis
                 Text = "…",
                 Location = new Point(246, 4),
                 Width = 28,
-                Height = 23
+                Height = 23,
+                BackColor = Color.White,
+                ForeColor = Color.Black,
+                UseVisualStyleBackColor = false
             };
             btnBrowse.Click += BtnBrowse_Click;
 
@@ -241,7 +244,10 @@ namespace Thetis
                 Text = "Launch",
                 Location = new Point(278, 4),
                 Width = 90,
-                Height = 23
+                Height = 23,
+                BackColor = Color.White,
+                ForeColor = Color.Black,
+                UseVisualStyleBackColor = false
             };
             btnLaunch.Click += (s, e) => LaunchOrAttach();
 
