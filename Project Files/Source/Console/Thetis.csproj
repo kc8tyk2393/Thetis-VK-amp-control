@@ -193,6 +193,12 @@
     </Compile>
     <Compile Include="FreeDVReporter\FreeDVReporterManager.cs" />
     <Compile Include="FreeDVReporter\Maidenhead.cs" />
+    <Compile Include="FLDIGI\FldigiManager.cs" />
+    <Compile Include="FLDIGI\FldigiAudioBridge.cs" />
+    <Compile Include="FLDIGI\FldigiControlBridge.cs" />
+    <Compile Include="WSJTX\WsjtManager.cs" />
+    <Compile Include="WSJTX\WsjtAudioBridge.cs" />
+    <Compile Include="WSJTX\WsjtCtlBridge.cs" />
     <Compile Include="Andromeda\displaysettingsform.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -455,6 +461,12 @@
     <Compile Include="Path_Illustrator.Designer.cs">
       <DependentUpon>Path_Illustrator.cs</DependentUpon>
     </Compile>
+    <Compile Include="scan.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="scan.Designer.cs">
+      <DependentUpon>scan.cs</DependentUpon>
+    </Compile>
     <Compile Include="portaudio.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -470,11 +482,11 @@
     <Compile Include="PSForm.designer.cs">
       <DependentUpon>PSForm.cs</DependentUpon>
     </Compile>
-    <Compile Include="radio.cs">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="ucHeliosDx.cs">
       <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="radio.cs">
+      <SubType>Code</SubType>
     </Compile>
     <Compile Include="RAForm.cs">
       <SubType>Form</SubType>
@@ -484,12 +496,6 @@
     </Compile>
     <Compile Include="ringbuffer.cs">
       <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="rxa.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="rxa.Designer.cs">
-      <DependentUpon>rxa.cs</DependentUpon>
     </Compile>
     <Compile Include="setup.cs">
       <SubType>Form</SubType>
@@ -750,6 +756,10 @@
     <EmbeddedResource Include="Path_Illustrator.resx">
       <DependentUpon>Path_Illustrator.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="scan.resx">
+      <DependentUpon>scan.cs</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
     <EmbeddedResource Include="progress.resx">
       <DependentUpon>progress.cs</DependentUpon>
       <SubType>Designer</SubType>
@@ -765,9 +775,6 @@
     </EmbeddedResource>
     <EmbeddedResource Include="RAForm.resx">
       <DependentUpon>RAForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="rxa.resx">
-      <DependentUpon>rxa.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="setup.resx">
       <DependentUpon>setup.cs</DependentUpon>
@@ -1022,7 +1029,8 @@ echo } &gt;&gt; "$(ProjectDir)VersionInfo.cs"
     <!-- <Copy SourceFiles="$(ProjectDir)..\..\lib\Thetis-resources\zetaHat.bin" DestinationFolder="$(ProjectDir)$(OutDir)" /> -->
     <Copy SourceFiles="$(ProjectDir)..\..\lib\NR_Algorithms_x64\rnnoise_weights_small.bin" DestinationFolder="$(ProjectDir)$(OutDir)" />
     <Copy SourceFiles="$(ProjectDir)..\..\lib\NR_Algorithms_x64\rnnoise_weights_large.bin" DestinationFolder="$(ProjectDir)$(OutDir)" />
-    <Copy SourceFiles="$(NuGetPackageRoot)\skiasharp.nativeassets.win32\3.119.2\runtimes\win-x64\native\libSkiaSharp.dll" DestinationFolder="$(ProjectDir)$(OutDir)" />
+    <Copy Condition="Exists('$(NuGetPackageRoot)skiasharp.nativeassets.win32\3.119.2\runtimes\win-x64\native\libSkiaSharp.dll')" SourceFiles="$(NuGetPackageRoot)skiasharp.nativeassets.win32\3.119.2\runtimes\win-x64\native\libSkiaSharp.dll" DestinationFolder="$(ProjectDir)$(OutDir)" />
+    <Copy Condition="!Exists('$(NuGetPackageRoot)skiasharp.nativeassets.win32\3.119.2\runtimes\win-x64\native\libSkiaSharp.dll') And Exists('$(UserProfile)\.nuget\packages\skiasharp.nativeassets.win32\3.119.2\runtimes\win-x64\native\libSkiaSharp.dll')" SourceFiles="$(UserProfile)\.nuget\packages\skiasharp.nativeassets.win32\3.119.2\runtimes\win-x64\native\libSkiaSharp.dll" DestinationFolder="$(ProjectDir)$(OutDir)" />
   </Target>
 
 </Project>

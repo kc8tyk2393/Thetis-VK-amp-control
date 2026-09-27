@@ -137,6 +137,7 @@
         private System.Windows.Forms.CheckBoxTS chkVAC1;
         private System.Windows.Forms.ComboBoxTS comboDigTXProfile;
         private System.Windows.Forms.CheckBoxTS chkRADE;
+        private System.Windows.Forms.CheckBoxTS btnFreeDV;
         private System.Windows.Forms.CheckBoxTS chkREPR;
         private System.Windows.Forms.CheckBoxTS chkVIS;
         private System.Windows.Forms.ComboBoxTS cmbRadeVersionRX1;
@@ -345,9 +346,12 @@
         private MenuStrip menuStrip1;
         private ToolStripMenuItem setupToolStripMenuItem;
         private ToolStripMenuItem memoryToolStripMenuItem;
+        private ToolStripMenuItem scanToolStripMenuItem; // ke9ns add Scanner
         private ToolStripMenuItem equalizerToolStripMenuItem;
         private ToolStripMenuItem xVTRsToolStripMenuItem;
         private ToolStripMenuItem cWXToolStripMenuItem;
+        private ToolStripMenuItem fldigiToolStripMenuItem;
+        private ToolStripMenuItem wsjtXToolStripMenuItem;
         private ToolStripMenuItem eSCToolStripMenuItem;
         private ToolStripMenuItem collapseToolStripMenuItem;
         private ToolStripMenuItem filterToolStripMenuItem;
@@ -644,6 +648,7 @@
             this.chkVAC1 = new System.Windows.Forms.CheckBoxTS();
             this.comboDigTXProfile = new System.Windows.Forms.ComboBoxTS();
             this.chkRADE = new System.Windows.Forms.CheckBoxTS();
+            this.btnFreeDV = new System.Windows.Forms.CheckBoxTS();
             this.chkREPR = new System.Windows.Forms.CheckBoxTS();
             this.chkVIS = new System.Windows.Forms.CheckBoxTS();
             this.cmbRadeVersionRX1 = new System.Windows.Forms.ComboBoxTS();
@@ -769,10 +774,13 @@
             this.toolStripMenuItem1 = new System.Windows.Forms.ToolStripSeparator();
             this.databaseManagerToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.memoryToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.scanToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem(); // ke9ns add Scanner
             this.equalizerToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.vstToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.xVTRsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.cWXToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.fldigiToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.wsjtXToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.eSCToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.collapseToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.displayControlsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -4285,10 +4293,13 @@
             this.menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.setupToolStripMenuItem,
             this.memoryToolStripMenuItem,
+            this.scanToolStripMenuItem,
             this.equalizerToolStripMenuItem,
             this.vstToolStripMenuItem,
             this.xVTRsToolStripMenuItem,
             this.cWXToolStripMenuItem,
+            this.fldigiToolStripMenuItem,
+            this.wsjtXToolStripMenuItem,
             this.eSCToolStripMenuItem,
             this.collapseToolStripMenuItem,
             this.displayControlsToolStripMenuItem,
@@ -4341,6 +4352,13 @@
             resources.ApplyResources(this.memoryToolStripMenuItem, "memoryToolStripMenuItem");
             this.memoryToolStripMenuItem.Click += new System.EventHandler(this.memoryToolStripMenuItem_Click);
             // 
+            // scanToolStripMenuItem
+            // 
+            this.scanToolStripMenuItem.ForeColor = System.Drawing.SystemColors.ControlLightLight;
+            this.scanToolStripMenuItem.Name = "scanToolStripMenuItem";
+            this.scanToolStripMenuItem.Text = "Scanner";
+            this.scanToolStripMenuItem.Click += new System.EventHandler(this.ScanMenuItem_Click);
+            // 
             // equalizerToolStripMenuItem
             // 
             this.equalizerToolStripMenuItem.ForeColor = System.Drawing.SystemColors.ControlLightLight;
@@ -4368,6 +4386,20 @@
             this.cWXToolStripMenuItem.Name = "cWXToolStripMenuItem";
             resources.ApplyResources(this.cWXToolStripMenuItem, "cWXToolStripMenuItem");
             this.cWXToolStripMenuItem.Click += new System.EventHandler(this.cWXToolStripMenuItem_Click);
+            // 
+            // fldigiToolStripMenuItem
+            // 
+            this.fldigiToolStripMenuItem.ForeColor = System.Drawing.SystemColors.ControlLightLight;
+            this.fldigiToolStripMenuItem.Name = "fldigiToolStripMenuItem";
+            this.fldigiToolStripMenuItem.Text = "FLDIGI";
+            this.fldigiToolStripMenuItem.Click += new System.EventHandler(this.fldigiToolStripMenuItem_Click);
+            // 
+            // wsjtXToolStripMenuItem
+            // 
+            this.wsjtXToolStripMenuItem.ForeColor = System.Drawing.SystemColors.ControlLightLight;
+            this.wsjtXToolStripMenuItem.Name = "wsjtXToolStripMenuItem";
+            this.wsjtXToolStripMenuItem.Text = "WSJT-X";
+            this.wsjtXToolStripMenuItem.Click += new System.EventHandler(this.wsjtXToolStripMenuItem_Click);
             // 
             // eSCToolStripMenuItem
             // 
@@ -7135,8 +7167,29 @@
             this.panelMode.Controls.Add(this.radModeDRM);
             this.panelMode.Controls.Add(this.radModeDIGL);
             this.panelMode.Controls.Add(this.radModeSPEC);
+            this.panelMode.Controls.Add(this.btnFreeDV);
             this.panelMode.ForeColor = System.Drawing.SystemColors.ControlLightLight;
             this.panelMode.Name = "panelMode";
+            // 
+            // btnFreeDV  [v2.10.3.16] front-console toggle for the RX1 RADE modem
+            //             (not a mode: mode selection stays active underneath it)
+            // 
+            this.btnFreeDV.Appearance = System.Windows.Forms.Appearance.Button;
+            this.btnFreeDV.BackColor = System.Drawing.SystemColors.Control;
+            this.btnFreeDV.FlatAppearance.BorderSize = 0;
+            this.btnFreeDV.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnFreeDV.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnFreeDV.ForeColor = System.Drawing.Color.White;
+            this.btnFreeDV.Location = new System.Drawing.Point(10, 99);
+            this.btnFreeDV.Name = "btnFreeDV";
+            this.btnFreeDV.Size = new System.Drawing.Size(60, 23);
+            this.btnFreeDV.TabIndex = 200;
+            this.btnFreeDV.Text = "FreeDV";
+            this.btnFreeDV.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.toolTip1.SetToolTip(this.btnFreeDV, "Enable/disable the RADE V1 digital-voice modem (mirrors RADE on the front console and Setup -> DSP -> RADE). Toggling either control sets both.");
+            this.btnFreeDV.UseVisualStyleBackColor = false;
+            this.btnFreeDV.CheckedChanged += new System.EventHandler(this.btnFreeDV_CheckedChanged);
+            this.btnFreeDV.MouseDown += new System.Windows.Forms.MouseEventHandler(this.btnFreeDV_MouseDown);
             // 
             // panelBandHF
             // 

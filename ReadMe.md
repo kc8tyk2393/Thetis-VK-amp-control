@@ -2,16 +2,6 @@ What is SDR-VST3?
 SDR-VST3 is a fork of Thetis (the OpenHPSDR software-defined radio console application) that adds built-in VST3 audio plugin support to ham radio operations. It allows operators to insert professional audio plugins (EQs, compressors, gates, limiters, noise reduction, etc.) into both the RX (receive) and TX (transmit) signal chains — similar to how a DAW works, but for live radio signal processing.
 Originally called "Thetis Plus", it was rebranded to SDR-VST3 in v4.1 (at the suggestion of Thetis maintainer Richie MW0LGE) to run as a fully independent, side-by-side installation alongside standard Thetis.
 
-## Windows installer
-
-GitHub Actions builds a Windows auto-installer (WiX `.exe` bootstrapper plus `.msi`).
-
-1. Open **Actions → Build Windows Installer → Run workflow**, or push a tag such as `v5.1.0`.
-2. Download **Thetis-VK-amp-control-windows-installer** from the workflow artifacts, or from the GitHub **Releases** page when a `v*` tag is pushed.
-3. Run the `.exe`. It installs the .NET 10 Desktop Runtime if needed, then installs into `C:\Program Files\OpenHPSDR\SDR-VST3` and creates the **Thetis VK amp control** shortcut.
-
-Do not run Thetis from a Desktop copy of the files; Windows Firewall only allows the Program Files install.
-
 Key changes in this release:
 - New name, new look — The fork is now called "SDR-VST3" with updated splash screen, app icon, and installer artwork.
 - 
@@ -35,6 +25,19 @@ it is only for 64bit systems there is no x86 32 bit version.
 Special Thanks to chasingcoffee his hard work is what made this vst version possible  
 Forked from his original at his github page 
 https://github.com/ChasingCoffee/Thetis/tree/vst-support
+
+
+Credits — RADE / FreeDV digital voice
+The RADE (Radio AutoEncoder) digital-voice modem and FreeDV integration was ported from Christos Nikolaou's (SV1EIA) Thetis-RADE fork:
+https://github.com/sv1eia/Thetis-RADE
+
+Special thanks to:
+- Christos Nikolaou (SV1EIA) <sv1eia@gmail.com> — the Thetis-RADE fork and C port of the RADE modem this feature is built on
+- Peter B Marks — radae_nopy, the reference implementation the RADE port was made from
+- David Rowe & Jean-Marc Valin — original authors of RADE (Radio AutoEncoder)
+- The FreeDV project (David Rowe / drowe67) — FreeDV-GUI's rade_text reliable-text codec and the codec2 library used for EOO callsign frames
+
+The RADE DSP dependencies vendored under Project Files/lib/ keep their own licences (BSD-2-Clause / BSD-3-Clause / MIT / LGPL-2.1); see the commit_pin.txt and LICENSE / NOTICE files in each lib/<vendor> directory.
 
 
 Changelog

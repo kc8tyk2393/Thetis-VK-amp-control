@@ -29,6 +29,8 @@
 <?define FilesPath = "..\..\Bin\$(var.Platform)\$(var.Configuration)\" ?>
 <?endif ?>
 <?define LspPath = "..\..\lib\lsp\" ?>
+<?define FldigiPath = "..\..\..\payload\Fldigi\" ?>
+<?define WsjtXPath = "..\..\..\payload\WsjtX\" ?>
 
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
       xmlns:fire="http://schemas.microsoft.com/wix/FirewallExtension">
@@ -80,8 +82,11 @@
 
     <Feature Id="ProductFeature" Title="SDR-VST3" Level="1" ConfigurableDirectory="INSTALLFOLDER">
       <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="FldigiComponents" />
+      <ComponentGroupRef Id="WsjtXComponents" />
       <ComponentGroupRef Id="LspComponents" />
       <ComponentGroupRef Id="SDRVST3SkinComponents" />
+      <ComponentGroupRef Id="HfgcsComponents" />
       <ComponentGroupRef Id="RuntimeAssets" />
       <ComponentGroupRef Id="LicensesComponents" />
       <ComponentRef Id="StartMenuShortcut" />
@@ -138,6 +143,16 @@
       <Component Guid="*" Directory="LicensesDir"><File Id="NoticeFTDI" Source="$(var.LicensesPath)NOTICE-FTDI2XX.txt" KeyPath="yes"/></Component>
       <Component Guid="*" Directory="LicensesDir"><File Id="LicPortAudio" Source="$(var.LicensesPath)LICENSE-PortAudio.txt" KeyPath="yes"/></Component>
       <Component Guid="*" Directory="LicensesDir"><File Id="LicSpecbleach" Source="$(var.LicensesPath)LICENSE-libspecbleach.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicFldigi" Source="$(var.LicensesPath)LICENSE-fldigi.txt" KeyPath="yes"/></Component>
+      <Component Guid="*" Directory="LicensesDir"><File Id="LicWsjtX" Source="$(var.LicensesPath)LICENSE-WSJT-X.txt" KeyPath="yes"/></Component>
+    </ComponentGroup>
+
+    <!-- default GCS (global communications system) scanner list shipped to the user's AppData
+         so the Custom Scanner List is ready to use after install; ~/.config path on x64 -->
+    <ComponentGroup Id="HfgcsComponents">
+      <Component Id="HfgcsTxt" Guid="*" Directory="CustomScannerListDir">
+        <File Id="HfgcsTxtFile" Source="CustomScannerList\hfgcs.txt" KeyPath="yes" />
+      </Component>
     </ComponentGroup>
 
     <Feature Id="VC145Redist" Title="Visual C++ 14.5 Runtime" AllowAdvertise="no" Display="hidden" Level="1">
@@ -199,6 +214,14 @@
               </Directory>
             </Directory>
             <Directory Id="LicensesDir" Name="Licenses"/>
+            <!-- [fldigi] prebuilt sidecar: Fldigi\fldigi.exe + runtime DLLs from
+                 payload\Fldigi (git-tracked); FldigiManager probes
+                 [INSTALLFOLDER]\Fldigi\fldigi.exe first -->
+            <Directory Id="FldigiDir" Name="Fldigi"/>
+            <!-- [wsjtx] prebuilt sidecar: WsjtX\wsjtx.exe + runtime DLLs + Qt
+                 plugins from payload\WsjtX (git-tracked); WsjtManager probes
+                 [INSTALLFOLDER]\WsjtX\wsjtx.exe first -->
+            <Directory Id="WsjtXDir" Name="WsjtX"/>
 		  </Directory>
         </Directory>
       </Directory>
@@ -232,11 +255,19 @@
   </Fragment>
 
   <Fragment>
+    <DirectoryRef Id="OpenHPSDRAppData">
+      <Directory Id="SDRVST3x64AppData" Name="SDR-VST3-x64">
+        <Directory Id="CustomScannerListDir" Name="CustomScannerList" />
+      </Directory>
+    </DirectoryRef>
+  </Fragment>
+
+  <Fragment>
     <DirectoryRef Id="DesktopFolder">
       <Component Id="DesktopShortcut" Guid="6A395378-66D6-4986-97C6-8CF9423A066C">       
         <Shortcut Id="ProgramDesktopShortcut"
-                  Name="Thetis VK amp control"
-                  Description="Run Thetis VK amp control"
+                  Name="$(var.ThetisName)"
+                  Description="Run SDR-VST3"
                   Target="[INSTALLFOLDER]Thetis.exe"
                   WorkingDirectory="INSTALLFOLDER" />
         <RegistryValue Root="HKLM" Key="Software\OpenHPSDR\$(var.ThetisName)"
@@ -248,8 +279,8 @@
       <Component Id="StartMenuShortcut">
               
         <Shortcut Id="ThetisShortcut"
-                  Name="Thetis VK amp control"
-                  Description="Run Thetis VK amp control"
+                  Name="$(var.ThetisName)"
+                  Description="Run SDR-VST3"
                   Target="[INSTALLFOLDER]Thetis.exe"
                   WorkingDirectory="INSTALLFOLDER"
                   />
@@ -945,6 +976,36 @@
 		</Component>
 	</ComponentGroup>
 
+	<!-- fldigi sidecar payload: prebuilt exe + runtime DLLs shipped from the
+	     git-tracked payload\Fldigi folder.  Installed to [INSTALLFOLDER]\Fldigi
+	     so FldigiManager.ResolveExecutable() resolves them as the primary probe.
+	     Refresh payload\Fldigi on every fldigi rebuild. -->
+	<ComponentGroup Id="FldigiComponents" Directory="FldigiDir">
+		<Component Guid="*"><File Id="FldigiEXE" Source="$(var.FldigiPath)fldigi.exe" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibFLAC" Source="$(var.FldigiPath)libFLAC.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibfltk14" Source="$(var.FldigiPath)libfltk-1.4.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibfltkForms14" Source="$(var.FldigiPath)libfltk_forms-1.4.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibfltkGL14" Source="$(var.FldigiPath)libfltk_gl-1.4.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibfltkImages14" Source="$(var.FldigiPath)libfltk_images-1.4.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibgccseh1" Source="$(var.FldigiPath)libgcc_s_seh-1.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibiconv2" Source="$(var.FldigiPath)libiconv-2.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibintl8" Source="$(var.FldigiPath)libintl-8.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibjpeg8" Source="$(var.FldigiPath)libjpeg-8.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibmp3lame0" Source="$(var.FldigiPath)libmp3lame-0.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibmpg1230" Source="$(var.FldigiPath)libmpg123-0.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibogg0" Source="$(var.FldigiPath)libogg-0.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibopus0" Source="$(var.FldigiPath)libopus-0.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibpng1616" Source="$(var.FldigiPath)libpng16-16.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibportaudio" Source="$(var.FldigiPath)libportaudio.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibsamplerate0" Source="$(var.FldigiPath)libsamplerate-0.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibsndfile1" Source="$(var.FldigiPath)libsndfile-1.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibstdcpp6" Source="$(var.FldigiPath)libstdc++-6.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibvorbis0" Source="$(var.FldigiPath)libvorbis-0.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibvorbisenc2" Source="$(var.FldigiPath)libvorbisenc-2.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiLibwinpthread1" Source="$(var.FldigiPath)libwinpthread-1.dll" KeyPath="yes" Checksum="yes"/></Component>
+		<Component Guid="*"><File Id="FldigiZlib1" Source="$(var.FldigiPath)zlib1.dll" KeyPath="yes" Checksum="yes"/></Component>
+	</ComponentGroup>
+
 	<!-- LSP VST3 plugin suite installed to Common Files\VST3.
 	     Components are Permanent so uninstalling Thetis does not remove plugin
 	     files that other VST3 hosts may also use. -->
@@ -1007,6 +1068,91 @@
 	  </InstallExecuteSequence>
 	  
     <!--   -->
+  </Fragment>
+
+  <!-- wsjtx sidecar payload: prebuilt exe + runtime DLLs + Qt plugins shipped
+       from the git-tracked payload\WsjtX folder.  Installed to
+       [INSTALLFOLDER]\WsjtX so WsjtManager.ResolveExecutable() resolves them as
+       the primary probe.  Refresh payload\WsjtX on every wsjtx rebuild. -->
+  <Fragment>
+    <DirectoryRef Id="WsjtXDir">
+      <Directory Id="WsjtXPluginsDir" Name="plugins">
+        <Directory Id="WsjtXPluginsAudioDir" Name="audio"/>
+        <Directory Id="WsjtXPluginsImageformatsDir" Name="imageformats"/>
+        <Directory Id="WsjtXPluginsMediaserviceDir" Name="mediaservice"/>
+        <Directory Id="WsjtXPluginsPlatformsDir" Name="platforms"/>
+        <Directory Id="WsjtXPluginsPlaylistformatsDir" Name="playlistformats"/>
+        <Directory Id="WsjtXPluginsPrintsupportDir" Name="printsupport"/>
+        <Directory Id="WsjtXPluginsSqldriversDir" Name="sqldrivers"/>
+        <Directory Id="WsjtXPluginsStylesDir" Name="styles"/>
+      </Directory>
+    </DirectoryRef>
+  </Fragment>
+
+  <!-- wsjtx sidecar payload components (one per payload\WsjtX file). -->
+  <Fragment>
+    <ComponentGroup Id="WsjtXComponents">
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXjt9_exeF" Source="$(var.WsjtXPath)jt9.exe" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibboostfilesystemmt_dllF" Source="$(var.WsjtXPath)libboost_filesystem-mt.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibboostlogsetupmt_dllF" Source="$(var.WsjtXPath)libboost_log_setup-mt.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibboostlogmt_dllF" Source="$(var.WsjtXPath)libboost_log-mt.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibboostthreadmt_dllF" Source="$(var.WsjtXPath)libboost_thread-mt.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibbrotlicommon_dllF" Source="$(var.WsjtXPath)libbrotlicommon.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibbrotlidec_dllF" Source="$(var.WsjtXPath)libbrotlidec.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibbz21_dllF" Source="$(var.WsjtXPath)libbz2-1.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibdoubleconversion_dllF" Source="$(var.WsjtXPath)libdouble-conversion.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibfftw3fthreads3_dllF" Source="$(var.WsjtXPath)libfftw3f_threads-3.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibfftw3f3_dllF" Source="$(var.WsjtXPath)libfftw3f-3.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibfreetype6_dllF" Source="$(var.WsjtXPath)libfreetype-6.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibgccsseh1_dllF" Source="$(var.WsjtXPath)libgcc_s_seh-1.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibgfortran5_dllF" Source="$(var.WsjtXPath)libgfortran-5.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibglib200_dllF" Source="$(var.WsjtXPath)libglib-2.0-0.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibgomp1_dllF" Source="$(var.WsjtXPath)libgomp-1.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibgraphite2_dllF" Source="$(var.WsjtXPath)libgraphite2.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibhamlib4_dllF" Source="$(var.WsjtXPath)libhamlib-4.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibharfbuzz0_dllF" Source="$(var.WsjtXPath)libharfbuzz-0.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibiconv2_dllF" Source="$(var.WsjtXPath)libiconv-2.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibicudt78_dllF" Source="$(var.WsjtXPath)libicudt78.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibicuin78_dllF" Source="$(var.WsjtXPath)libicuin78.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibicuuc78_dllF" Source="$(var.WsjtXPath)libicuuc78.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibintl8_dllF" Source="$(var.WsjtXPath)libintl-8.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibjpeg8_dllF" Source="$(var.WsjtXPath)libjpeg-8.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibmd4c_dllF" Source="$(var.WsjtXPath)libmd4c.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibpcre2160_dllF" Source="$(var.WsjtXPath)libpcre2-16-0.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibpcre280_dllF" Source="$(var.WsjtXPath)libpcre2-8-0.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibpng1616_dllF" Source="$(var.WsjtXPath)libpng16-16.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibquadmath0_dllF" Source="$(var.WsjtXPath)libquadmath-0.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibsqlite30_dllF" Source="$(var.WsjtXPath)libsqlite3-0.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibstdc6_dllF" Source="$(var.WsjtXPath)libstdc++-6.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibusb10_dllF" Source="$(var.WsjtXPath)libusb-1.0.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibwinpthread1_dllF" Source="$(var.WsjtXPath)libwinpthread-1.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXlibzstd_dllF" Source="$(var.WsjtXPath)libzstd.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXqt_confF" Source="$(var.WsjtXPath)qt.conf" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXQt5Core_dllF" Source="$(var.WsjtXPath)Qt5Core.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXQt5Gui_dllF" Source="$(var.WsjtXPath)Qt5Gui.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXQt5Multimedia_dllF" Source="$(var.WsjtXPath)Qt5Multimedia.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXQt5Network_dllF" Source="$(var.WsjtXPath)Qt5Network.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXQt5PrintSupport_dllF" Source="$(var.WsjtXPath)Qt5PrintSupport.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXQt5SerialPort_dllF" Source="$(var.WsjtXPath)Qt5SerialPort.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXQt5Sql_dllF" Source="$(var.WsjtXPath)Qt5Sql.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXQt5WebSockets_dllF" Source="$(var.WsjtXPath)Qt5WebSockets.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXQt5Widgets_dllF" Source="$(var.WsjtXPath)Qt5Widgets.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXwsjtx_exeF" Source="$(var.WsjtXPath)wsjtx.exe" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXwsprd_exeF" Source="$(var.WsjtXPath)wsprd.exe" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXDir"><File Id="WsjtXzlib1_dllF" Source="$(var.WsjtXPath)zlib1.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXPluginsAudioDir"><File Id="WsjtXAudioqtaudiowindows_dllF" Source="$(var.WsjtXPath)plugins\audio\qtaudio_windows.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXPluginsImageformatsDir"><File Id="WsjtXImageformatsqgif_dllF" Source="$(var.WsjtXPath)plugins\imageformats\qgif.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXPluginsImageformatsDir"><File Id="WsjtXImageformatsqico_dllF" Source="$(var.WsjtXPath)plugins\imageformats\qico.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXPluginsImageformatsDir"><File Id="WsjtXImageformatsqjpeg_dllF" Source="$(var.WsjtXPath)plugins\imageformats\qjpeg.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXPluginsMediaserviceDir"><File Id="WsjtXMediaservicedsengine_dllF" Source="$(var.WsjtXPath)plugins\mediaservice\dsengine.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXPluginsMediaserviceDir"><File Id="WsjtXMediaserviceqtmediaaudioengine_dllF" Source="$(var.WsjtXPath)plugins\mediaservice\qtmedia_audioengine.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXPluginsMediaserviceDir"><File Id="WsjtXMediaservicewmfengine_dllF" Source="$(var.WsjtXPath)plugins\mediaservice\wmfengine.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXPluginsPlatformsDir"><File Id="WsjtXPlatformsqwindows_dllF" Source="$(var.WsjtXPath)plugins\platforms\qwindows.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXPluginsPlaylistformatsDir"><File Id="WsjtXPlaylistformatsqtmultimediam3u_dllF" Source="$(var.WsjtXPath)plugins\playlistformats\qtmultimedia_m3u.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXPluginsPrintsupportDir"><File Id="WsjtXPrintsupportwindowsprintersupport_dllF" Source="$(var.WsjtXPath)plugins\printsupport\windowsprintersupport.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXPluginsSqldriversDir"><File Id="WsjtXSqldriversqsqlite_dllF" Source="$(var.WsjtXPath)plugins\sqldrivers\qsqlite.dll" KeyPath="yes" Checksum="yes"/></Component>
+        <Component Guid="*" Directory="WsjtXPluginsStylesDir"><File Id="WsjtXStylesqwindowsvistastyle_dllF" Source="$(var.WsjtXPath)plugins\styles\qwindowsvistastyle.dll" KeyPath="yes" Checksum="yes"/></Component>
+    </ComponentGroup>
   </Fragment>
 
 </Wix>

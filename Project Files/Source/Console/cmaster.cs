@@ -297,6 +297,45 @@ namespace Thetis
         public static extern void SetRadaeBypassAll(int enable);
         // end radae
 
+        // fldigi HF digital-modes sidecar bridge.
+        // RX-side getters/setters take an `int rx` argument (0 = RX1,
+        // 1 = RX2); TX-side and transport PORTs are parameterless.
+        [DllImport("ChannelMaster.dll", EntryPoint = "SetFldigiRxEnable", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void SetFldigiRxEnable(int rx, int enable);
+        [DllImport("ChannelMaster.dll", EntryPoint = "GetFldigiRxEnable", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int GetFldigiRxEnable(int rx);
+        [DllImport("ChannelMaster.dll", EntryPoint = "SetFldigiTxEnable", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void SetFldigiTxEnable(int enable);
+        [DllImport("ChannelMaster.dll", EntryPoint = "GetFldigiTxEnable", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int GetFldigiTxEnable();
+        [DllImport("ChannelMaster.dll", EntryPoint = "SetFldigiMoxState", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void SetFldigiMoxState(int mox);
+        [DllImport("ChannelMaster.dll", EntryPoint = "FldigiDrainRx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int FldigiDrainRx(int rx, [In, Out] float[] out_, int maxCount);
+        [DllImport("ChannelMaster.dll", EntryPoint = "FldigiPushTx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void FldigiPushTx([In] float[] in8k, int count);
+        [DllImport("ChannelMaster.dll", EntryPoint = "FldigiFlush", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void FldigiFlush();
+        // end fldigi
+
+        // WSJT-X FT8/FT4 sidecar bridge.  RX-only for P1 (decode): the tap
+        // runs whenever a receiver is enabled, drained by WsjtAudioBridge.
+        [DllImport("ChannelMaster.dll", EntryPoint = "SetWsjtRxEnable", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void SetWsjtRxEnable(int rx, int enable);
+        [DllImport("ChannelMaster.dll", EntryPoint = "GetWsjtRxEnable", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int GetWsjtRxEnable(int rx);
+        [DllImport("ChannelMaster.dll", EntryPoint = "WsjtDrainRx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int WsjtDrainRx(int rx, [In, Out] float[] out_, int maxCount);
+        [DllImport("ChannelMaster.dll", EntryPoint = "WsjtFlush", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void WsjtFlush();
+        [DllImport("ChannelMaster.dll", EntryPoint = "SetWsjtTxEnable", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void SetWsjtTxEnable(int enable);
+        [DllImport("ChannelMaster.dll", EntryPoint = "SetWsjtMoxState", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void SetWsjtMoxState(int mox);
+        [DllImport("ChannelMaster.dll", EntryPoint = "WsjtPushTx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void WsjtPushTx([In, Out] float[] in8k, int count);
+        // end wsjtx
+
         // router
         [DllImport("ChannelMaster.dll", EntryPoint = "LoadRouterAll", CallingConvention = CallingConvention.Cdecl)]
         public static extern void LoadRouterAll(void* ptr, int id, int sources, int calls, int varvals, 
@@ -752,7 +791,6 @@ namespace Thetis
                                     LoadRouterAll((void*)0, 0, 1, 2, 8, pstreams, pfunction, pcallid);
                                 break;
                             case HPSDRModel.HERMES:
-                            case HPSDRModel.HERMESLITE:
                             case HPSDRModel.ANAN_G2E: //N1GP G2E added
                             case HPSDRModel.ANAN10:
                             case HPSDRModel.ANAN100:
@@ -843,7 +881,6 @@ namespace Thetis
                                     LoadRouterAll((void*)0, 0, 1, /*1*/2, 8, pstreams, pfunction, pcallid); //MW0LGE_21d DUP on top panadaptor (Warren provided info)
                                 break;
                             case HPSDRModel.HERMES:
-                            case HPSDRModel.HERMESLITE:
                             case HPSDRModel.ANAN_G2E: //N1GP G2E added
                             case HPSDRModel.ANAN10:
                             case HPSDRModel.ANAN100:
@@ -966,7 +1003,6 @@ namespace Thetis
                                 break;
 
                             case HPSDRModel.HERMES:
-                            case HPSDRModel.HERMESLITE:
                             case HPSDRModel.ANAN_G2E: //N1GP G2E added
                             case HPSDRModel.ANAN10:
                             case HPSDRModel.ANAN100:
@@ -1045,7 +1081,6 @@ namespace Thetis
                                 break;
 
                             case HPSDRModel.HERMES:
-                            case HPSDRModel.HERMESLITE:
                             case HPSDRModel.ANAN_G2E: //N1GP G2E added
                             case HPSDRModel.ANAN10:
                             case HPSDRModel.ANAN100:

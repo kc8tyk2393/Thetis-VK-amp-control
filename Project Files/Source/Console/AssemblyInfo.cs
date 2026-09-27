@@ -47,11 +47,11 @@ using System.Runtime.CompilerServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 //
-[assembly: AssemblyTitle("Thetis VK amp control")]
+[assembly: AssemblyTitle("Thetis")]
 [assembly: AssemblyDescription("Software Defined Radio Application")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("OpenHPSDR")]
-[assembly: AssemblyProduct("Thetis VK amp control")]
+[assembly: AssemblyProduct("Thetis")]
 [assembly: AssemblyCopyright("2026")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]		
@@ -67,8 +67,8 @@ using System.Runtime.CompilerServices;
 // You can specify all the values or you can default the Revision and Build Numbers 
 // by using the '*' as shown below:
 
-[assembly: AssemblyVersion("5.1")]
-[assembly: AssemblyFileVersion("5.1.0.0")]
+[assembly: AssemblyVersion("5.6")]
+[assembly: AssemblyFileVersion("5.6.0.0")]
 
 //
 // In order to sign your assembly you must specify a key to use. Refer to the 

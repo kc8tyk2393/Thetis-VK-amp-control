@@ -23,7 +23,7 @@ jobs:
           if ("${{ github.ref }}" -like 'refs/tags/v*') {
             $version = "${{ github.ref_name }}" -replace '^v', ''
           } else {
-            $version = "5.1.0.${{ github.run_number }}"
+            $version = "5.6.0.${{ github.run_number }}"
           }
           $file = "Project Files/Source/Console/AssemblyInfo.cs"
           $content = Get-Content $file -Raw

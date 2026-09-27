@@ -53,6 +53,19 @@ WinForms.DataVisualization*.dll, Microsoft.Bcl.*, Microsoft.Win32.Registry.dll,
 Microsoft.NET.StringTools.dll
                              LICENSE-DotNetLibraries.txt (MIT, .NET Foundation)
 
+fldigi.exe                    LICENSE-fldigi.txt (GPL-3)
+  (Fldigi install folder)       fldigi is Copyright (C) Dave Freese and
+                                 others; https://github.com/w1hkj/fldigi.
+                                 Shipped as a modified build that bridges
+                                 audio/CAT to SDR-VST3 over named pipes.
+
+wsjtx.exe, jt9.exe, wsprd.exe  LICENSE-WSJT-X.txt (GPL-3)
+  (WsjtX install folder)         WSJT-X is Copyright (C) the WSJT-X
+                                 Development Group;
+                                 https://github.com/WSJTX/wsjtx.  Shipped
+                                 as a modified build that bridges audio/CAT
+                                 to SDR-VST3 over named pipes.
+
 Components of SDR-VST3 itself (wdsp.dll, Midi2Cat.dll, RawInput.dll,
 cmASIO.dll, ChannelMaster.dll, PA19 host wrapper, VstHostBridge.dll,
 VstPluginScanner.dll) are part of the Thetis/SDR-VST3 project source and

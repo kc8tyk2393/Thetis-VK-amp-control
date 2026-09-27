@@ -91,13 +91,6 @@ namespace Thetis
                         NetworkIO.LRAudioSwap(1);
                         HardwareSpecific.Hardware = HPSDRHW.Hermes;
                         break;
-                    case HPSDRModel.HERMESLITE:
-                        NetworkIO.SetRxADC(1);
-                        NetworkIO.SetMKIIBPF(0);
-                        cmaster.SetADCSupply(0, 33);
-                        NetworkIO.LRAudioSwap(1);
-                        HardwareSpecific.Hardware = HPSDRHW.HermesLite;
-                        break;
                     case HPSDRModel.ANAN10:
                         NetworkIO.SetRxADC(1);
                         NetworkIO.SetMKIIBPF(0);
@@ -412,12 +405,7 @@ namespace Thetis
                 case "ANVELINA-PRO3":
                     return HPSDRModel.ANVELINAPRO3;
                 case "HERMESLITE":
-                case "HERMES-LITE":
-                case "HERMES LITE":
-                case "HERMES LITE 2":
-                case "HERMES-LITE2":
-                case "HERMES-LITE 2":
-                    return HPSDRModel.HERMES;
+                    return HPSDRModel.HERMESLITE;
                 case "RED-PITAYA":
                     return HPSDRModel.REDPITAYA;
                 case "ANAN-G2E":
@@ -457,7 +445,7 @@ namespace Thetis
                 case HPSDRModel.ANVELINAPRO3:
                     return "ANVELINA-PRO3";
                 case HPSDRModel.HERMESLITE:
-                    return "HERMES-LITE2";
+                    return "HERMES-LITE";
                 case HPSDRModel.REDPITAYA:
                     return "RED-PITAYA";
                 default:
@@ -549,7 +537,6 @@ namespace Thetis
             {
                 case HPSDRModel.FIRST:
                 case HPSDRModel.HERMES:
-                case HPSDRModel.HERMESLITE:
                 case HPSDRModel.HPSDR:
                 case HPSDRModel.ORIONMKII:
                     gains[(int)Band.B160M] = 41.0f;
@@ -858,7 +845,6 @@ namespace Thetis
             switch (_model)
             {
                 case HPSDRModel.HERMES:
-                case HPSDRModel.HERMESLITE:
                 case HPSDRModel.ANAN_G2E: //N1GP G2E added
                 case HPSDRModel.ANAN10:
                 case HPSDRModel.ANAN10E:

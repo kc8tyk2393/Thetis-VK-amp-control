@@ -160,6 +160,7 @@ namespace Thetis
 
         public MemoryForm memoryForm;
         public MemoryList MemoryList { get; private set; }
+        public ScanControl ScanForm; // ke9ns add Scanner
         //public WaveControl WaveForm;
 
         //====================================================================================
@@ -1118,6 +1119,46 @@ namespace Thetis
 
             //starting diversity
             if (_startdiversity) showHideDiversity(true, true);
+
+            //fldigi state menu (no auto-start by design)
+            UpdateFldigiMenuItem();
+            // keep the menu in sync when the sidecar exits on its own or is
+            // crash-recovered (the Exited/timer callbacks run off the UI thread)
+            if (!_fldigiMenuHooked)
+            {
+                _fldigiMenuHooked = true;
+                Thetis.FLDIGI.FldigiManager.StateChanged += (s, ev) =>
+                {
+                    if (IsDisposed) return;
+                    try
+                    {
+                        if (InvokeRequired)
+                            BeginInvoke(new Action(UpdateFldigiMenuItem));
+                        else
+                            UpdateFldigiMenuItem();
+                    }
+                    catch { }
+                };
+            }
+
+            //WSJT-X state menu (no auto-start by design)
+            UpdateWsjtMenuItem();
+            if (!_wsjtMenuHooked)
+            {
+                _wsjtMenuHooked = true;
+                Thetis.WSJTX.WsjtManager.StateChanged += (s, ev) =>
+                {
+                    if (IsDisposed) return;
+                    try
+                    {
+                        if (InvokeRequired)
+                            BeginInvoke(new Action(UpdateWsjtMenuItem));
+                        else
+                            UpdateWsjtMenuItem();
+                    }
+                    catch { }
+                };
+            }
 
             //release notes
             _frmReleaseNotes = new frmReleaseNotes();
@@ -2343,13 +2384,13 @@ namespace Thetis
         private void OnTCPIIPcatClientConnect()
         {
             if (m_tcpCATServer == null) return;
-            if (!IsSetupFormNull)
+            if (!IsSetupFormNull && !SetupForm.IsDisposed)
                 SetupForm.TCPIPcatClientsConnectedChange = m_tcpCATServer.ClientsConnected;
         }
         private void OnTCPIIPcatClientDisconnect()
         {
             if (m_tcpCATServer == null) return;
-            if (!IsSetupFormNull)
+            if (!IsSetupFormNull && !SetupForm.IsDisposed)
                 SetupForm.TCPIPcatClientsConnectedChange = m_tcpCATServer.ClientsConnected;
         }
         private void OnTCPIIPcatClientError(SocketException se)
@@ -2491,13 +2532,13 @@ namespace Thetis
         private void OnTCIClientConnect()
         {
             if (m_tcpTCIServer == null) return;
-            if (!IsSetupFormNull)
+            if (!IsSetupFormNull && !SetupForm.IsDisposed)
                 SetupForm.TCIClientsConnectedChange = m_tcpTCIServer.ClientsConnected;
         }
         private void OnTCIClientDisconnect()
         {
             if (m_tcpTCIServer == null) return;
-            if (!IsSetupFormNull)
+            if (!IsSetupFormNull && !SetupForm.IsDisposed)
                 SetupForm.TCIClientsConnectedChange = m_tcpTCIServer.ClientsConnected;
         }
         private void OnTCIClientError(SocketException se)
@@ -2720,6 +2761,13 @@ namespace Thetis
         public void ExitConsole()
         {
             shutdownLogStringToPath("Inside ExitConsole()");
+
+            // Tear down the fldigi sidecar + named-pipe bridges BEFORE the
+            // audio interface terminates (native taps + pipe threads).  This
+            // also kills fldigi.exe if it is running.
+            try { Thetis.FLDIGI.FldigiManager.Shutdown(); } catch { }
+            // Tear down the WSJT-X sidecar + audio bridge the same way.
+            try { Thetis.WSJTX.WsjtManager.Shutdown(); } catch { }
 
             shutdownLogStringToPath("Before recorder/player stops");
             ARP.StopRecord(out _);
@@ -5801,22 +5849,28 @@ namespace Thetis
 
         private void DisableAllModes()
         {
-            foreach (RadioButtonTS r in panelMode.Controls)
+            foreach (Control c in panelMode.Controls)
             {
-                r.Enabled = false;
-                if (r.BackColor == button_selected_color)
-                    r.BackColor = vfo_text_dark_color;
+                if (c is RadioButtonTS r)
+                {
+                    r.Enabled = false;
+                    if (r.BackColor == button_selected_color)
+                        r.BackColor = vfo_text_dark_color;
+                }
             }
         }
 
         private void EnableAllModes()
         {
-            foreach (RadioButtonTS r in panelMode.Controls)
+            foreach (Control c in panelMode.Controls)
             {
-                if (!string.IsNullOrEmpty(r.Text))
-                    r.Enabled = true;
-                if (r.BackColor == vfo_text_dark_color)
-                    r.BackColor = button_selected_color;
+                if (c is RadioButtonTS r)
+                {
+                    if (!string.IsNullOrEmpty(r.Text))
+                        r.Enabled = true;
+                    if (r.BackColor == vfo_text_dark_color)
+                        r.BackColor = button_selected_color;
+                }
             }
         }
 
@@ -5986,6 +6040,30 @@ namespace Thetis
                 )
                 SetBandChangeHanders?.Invoke(1, oldBand, RX1Band, oldMode, RX1DSPMode, oldFilter, RX1Filter, oldFreq, VFOAFreq,
                     oldCentreFreq, CentreFrequency, oldCtun, ClickTuneDisplay, oldZoomSlider, ptbDisplayZoom.Value);
+        }
+
+        // ke9ns add 3-arg SetBand convenience overload for the Scanner
+        public void SetBand(string mode, string filter, double freq)
+        {
+            SetBand(mode, filter, freq, false, ptbDisplayZoom.Value, 0);
+        }
+
+        // ke9ns add .222 SetBand2 for the SCAN (RX2 / VFO B)
+        public void SetBand2(string mode, string filter, double freq)
+        {
+            // Set mode, filter, and frequency according to passed parameters
+            RX2DSPMode = (DSPMode)Enum.Parse(typeof(DSPMode), mode, true);
+
+            if (_rx2_dsp_mode != DSPMode.DRM && _rx2_dsp_mode != DSPMode.SPEC)
+            {
+                RX2Filter = (Filter)Enum.Parse(typeof(Filter), filter, true);
+            }
+
+            _force_vfo_update = true;
+            VFOBFreq = freq;
+            _force_vfo_update = false;
+
+            PanCentreRX2();
         }
 
         private RadioButtonTS getButtonForBand(Band b)
@@ -8392,7 +8470,6 @@ namespace Thetis
                     }
                     break;
                 case HPSDRModel.HERMES:
-                case HPSDRModel.HERMESLITE:
                 case HPSDRModel.ANAN_G2E: //N1GP G2E added
                 case HPSDRModel.ANAN10:
                 case HPSDRModel.ANAN100:
@@ -8827,6 +8904,22 @@ namespace Thetis
             else
                 eSCToolStripMenuItem.ForeColor = SystemColors.ControlLightLight;
         }
+        public void UpdateFldigiMenuItem()
+        {
+            if (fldigiToolStripMenuItem == null) return;
+            // Launch-only menu entry: no state colour (never turns green).
+            // The sidecar's on/off is visible from fldigi itself.
+            fldigiToolStripMenuItem.ForeColor = SystemColors.ControlLightLight;
+        }
+        public void UpdateWsjtMenuItem()
+        {
+            if (wsjtXToolStripMenuItem == null) return;
+            // Launch-only menu entry: no state colour (never turns green).
+            // The sidecar's on/off is visible from WSJT-X itself.
+            wsjtXToolStripMenuItem.ForeColor = SystemColors.ControlLightLight;
+        }
+        private static bool _wsjtMenuHooked;
+        private static bool _fldigiMenuHooked;
         private void UpdateDiversityValues()
         {
             if (!initializing && diversityForm != null)
@@ -11957,6 +12050,14 @@ namespace Thetis
             //vac buttons
             Common.HightlightControl(chkVAC1, bHighlight);
             Common.HightlightControl(chkVAC2, bHighlight);
+
+            //vst host bypass buttons (state saved with tx profile)
+            Common.HightlightControl(chkTXVST, bHighlight);
+            Common.HightlightControl(chkRXVST, bHighlight);
+
+            VstChainManagerForm.HighlightProfileSaveItems = bHighlight;
+            if (m_frmVstChainManager != null && !m_frmVstChainManager.IsDisposed)
+                m_frmVstChainManager.HighlightTXProfileSaveItems(bHighlight);
         }
         public bool DX
         {
@@ -14812,12 +14913,6 @@ namespace Thetis
                     chkDX.Visible = false;
                     _rx2_preamp_present = false;
                     break;
-                case HPSDRModel.HERMESLITE:
-                    chkDX.Checked = false;
-                    chkDX.Visible = false;
-                    _rx2_preamp_present = false;
-                    chkFullDuplex.Visible = true;
-                    break;
                 case HPSDRModel.ANAN10:
                     chkDX.Checked = false;
                     chkDX.Visible = false;
@@ -14887,7 +14982,6 @@ namespace Thetis
                 case HPSDRModel.HPSDR:
                     break;
                 case HPSDRModel.HERMES:
-                case HPSDRModel.HERMESLITE:
                 case HPSDRModel.ANAN10:
                 case HPSDRModel.ANAN10E:
                 case HPSDRModel.ANAN100:
@@ -15434,7 +15528,6 @@ namespace Thetis
             switch (HardwareSpecific.Model)
             {
                 case HPSDRModel.HERMES:
-                case HPSDRModel.HERMESLITE:
                 case HPSDRModel.ANAN10:
                 case HPSDRModel.ANAN10E:
                 case HPSDRModel.ANAN100:
@@ -15474,7 +15567,6 @@ namespace Thetis
             switch (HardwareSpecific.Model)
             {
                 case HPSDRModel.HERMES:
-                case HPSDRModel.HERMESLITE:
                 case HPSDRModel.ANAN_G2E: //N1GP G2E added
                 case HPSDRModel.ANAN10:
                 case HPSDRModel.ANAN10E:
@@ -27833,7 +27925,6 @@ namespace Thetis
                             break;
                         // 4 & 5 DDC Models
                         case HPSDRModel.HERMES:
-                case HPSDRModel.HERMESLITE:
                         case HPSDRModel.ANAN_G2E: //N1GP G2E added
                         case HPSDRModel.ANAN10:
                         case HPSDRModel.ANAN100:
@@ -27853,7 +27944,6 @@ namespace Thetis
                     {
                         // 2-DDC Models
                         case HPSDRModel.HERMES:
-                case HPSDRModel.HERMESLITE:
                         case HPSDRModel.ANAN_G2E: //N1GP G2E added
                         case HPSDRModel.ANAN10E:
                         case HPSDRModel.ANAN10:
@@ -28667,6 +28757,7 @@ namespace Thetis
             if (EQForm != null) EQForm.Close();
             if (m_frmVstChainManager != null) m_frmVstChainManager.Close();
             if (memoryForm != null) memoryForm.Close();
+            if (ScanForm != null && !ScanForm.IsDisposed) ScanForm.Dispose();
             if (diversityForm != null) diversityForm.Close();
             if (heliosDxBox != null && !heliosDxBox.IsDisposed)
             {
@@ -29275,7 +29366,13 @@ namespace Thetis
             if (_mox) signal_x = sql_x = 0;
             e.Graphics.FillRectangle(Brushes.LimeGreen, 0, 0, signal_x, picSquelch.Height);
             if (sql_x < signal_x)
+            {
                 e.Graphics.FillRectangle(Brushes.Red, sql_x + 1, 0, signal_x - sql_x - 1, picSquelch.Height);
+                ScanControl.ScanStop = 1; // ke9ns add for scanner
+            }
+
+            ScanControl.SQL = (int)ptbSquelch.Value;
+            ScanControl.SIG = (int)sql_data;
         }
 
         private void chkNoiseGate_CheckedChanged(object sender, System.EventArgs e)
@@ -37489,6 +37586,7 @@ namespace Thetis
             try
             {
                 if (chkRADE != null) { chkRADE.Visible = visible; chkRADE.Enabled = visible; }
+                if (btnFreeDV != null) { btnFreeDV.Visible = visible; btnFreeDV.Enabled = visible; }
                 if (chkREPR != null) { chkREPR.Visible = visible; chkREPR.Enabled = visible; }
                 if (chkVIS  != null) { chkVIS.Visible  = visible; chkVIS.Enabled  = visible; }
                 // Version combo: visibility follows the master; always enabled.
@@ -37501,8 +37599,22 @@ namespace Thetis
         {
             try
             {
+                if (btnFreeDV != null && btnFreeDV.Checked != chkRADE.Checked)
+                    btnFreeDV.Checked = chkRADE.Checked;
                 if (!IsSetupFormNull && SetupForm.RADAE != chkRADE.Checked)
                     SetupForm.RADAE = chkRADE.Checked;
+            }
+            catch { }
+        }
+        private void btnFreeDV_CheckedChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                btnFreeDV.BackColor = btnFreeDV.Checked ? button_selected_color : SystemColors.Control;
+                if (chkRADE != null && chkRADE.Checked != btnFreeDV.Checked)
+                    chkRADE.Checked = btnFreeDV.Checked;
+                if (!IsSetupFormNull && SetupForm.RADAE != btnFreeDV.Checked)
+                    SetupForm.RADAE = btnFreeDV.Checked;
             }
             catch { }
         }
@@ -39377,7 +39489,13 @@ namespace Thetis
             //if (_mox) signal_x = sql_x = 0;
             e.Graphics.FillRectangle(Brushes.LimeGreen, 0, 0, signal_x, picRX2Squelch.Height);
             if (sql_x < signal_x)
+            {
                 e.Graphics.FillRectangle(Brushes.Red, sql_x + 1, 0, signal_x - sql_x - 1, picRX2Squelch.Height);
+                ScanControl.ScanStop2 = 1; // ke9ns add for scanner .244
+            }
+
+            ScanControl.SQL2 = (int)ptbRX2Squelch.Value;
+            ScanControl.SIG2 = (int)rx2_sql_data;
         }
         private void chkRX1Preamp_CheckedChanged(object sender, System.EventArgs e)
         {
@@ -41386,6 +41504,37 @@ namespace Thetis
             RF = record.AGCT;
         }
 
+        // ke9ns add .206 RX2 - recall memory for the SCAN (2nd RX / VFO B)
+        public void RecallMemoryB(MemoryRecord record)
+        {
+            VFOBFreq = record.RXFreq;
+            RX2DSPMode = record.DSPMode;
+
+            TuneStepIndex = TuneStepLookup(record.TuneStep);
+
+            if (record.DSPMode == DSPMode.FM)
+            {
+                CurrentFMTXMode = record.RPTR;
+                FMTXOffsetMHz = record.RPTROffset;
+                CTCSSOn = record.CTCSSOn;
+                CTCSSFreq = record.CTCSSFreq;
+                FMDeviation_Hz = record.Deviation;
+            }
+            else
+            {
+                RX2Filter = record.RXFilter;
+                if (record.RXFilter == Filter.VAR1 || record.RXFilter == Filter.VAR2)
+                    UpdateRX2Filters(record.RXFilterLow, record.RXFilterHigh);
+            }
+
+            PWR = record.Power;
+            VFOSplit = record.Split;
+            TXFreq = record.TXFreq;
+            RX2AGCMode = record.AGCMode;
+            if (RX2RF != record.AGCT && AutoAGCRX2) AutoAGCRX2 = false; // turn off 'auto agc' only if different MW0LGE_21k8
+            RX2RF = record.AGCT;
+        }
+
         private void comboFMMemory_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (comboFMMemory.Items.Count == 0 || comboFMMemory.SelectedItem == null) return;
@@ -41459,6 +41608,28 @@ namespace Thetis
                 memoryForm.Show();
                 memoryForm.Focus();
                 SetFocusMaster(false);
+            }
+        }
+
+        // ke9ns add Scanner
+        private void ScanMenuItem_Click(object sender, EventArgs e)
+        {
+            if (ScanForm == null || ScanForm.IsDisposed)
+                ScanForm = new ScanControl(this);
+            if (ScanForm.InvokeRequired)
+            {
+                ScanForm.Invoke(new MethodInvoker(() =>
+                {
+                    ScanForm.Show();
+                    ScanForm.Focus();
+                    ScanForm.WindowState = FormWindowState.Normal;
+                }));
+            }
+            else
+            {
+                ScanForm.Show();
+                ScanForm.Focus();
+                ScanForm.WindowState = FormWindowState.Normal;
             }
         }
 
@@ -41601,7 +41772,6 @@ namespace Thetis
 
                     break;
                 case HPSDRModel.HERMES:
-                case HPSDRModel.HERMESLITE:
                     if (alexpresent)
                     {
                         comboPreamp.Items.AddRange(on_off_preamp_settings);
@@ -43827,6 +43997,43 @@ namespace Thetis
             showHideDiversity(true);
         }
 
+        private void fldigiToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            // The menu (re)launches the sidecar; it does NOT close it.  The
+            // operator stops fldigi by closing its window (graceful exit ->
+            // session off) or by Thetis exiting.  Ignore a click while the
+            // session is already on.
+            if (Thetis.FLDIGI.FldigiManager.Enabled)
+                return;
+            // Mutual exclusion with RADE/FreeDV: the fldigi sidecar and the
+            // RADE modem cannot run at the same time, so turning fldigi ON
+            // turns RADE OFF.  SetupForm.RADAE / RADAERX2 are the single
+            // choke points (idempotent setters -> chkRADAE* ->
+            // chkRADAE*_CheckedChanged).  RX2 too: its encoder shares the
+            // TX chain, so a live sidecar must see RADE off end to end.
+            try { if (!IsSetupFormNull && SetupForm.RADAE) SetupForm.RADAE = false; } catch { }
+            try { if (!IsSetupFormNull && SetupForm.RADAERX2) SetupForm.RADAERX2 = false; } catch { }
+            Thetis.FLDIGI.FldigiManager.SetEnabled(true);
+            UpdateFldigiMenuItem();
+        }
+
+        private void wsjtXToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            // Launch-only, like the FDIGI entry.  The operator stops WSJT-X
+            // by closing its window (graceful exit -> session off) or by
+            // Thetis exiting.  Ignore a click while the session is already on.
+            if (Thetis.WSJTX.WsjtManager.Enabled)
+                return;
+            // Mutual exclusion with RADE/FreeDV: RADE RX re-injects decoded
+            // speech into the AF in-place, which would corrupt the FT8 tap
+            // (the WSJT-X tap runs after xradae_rx on the same buffer), so
+            // turning WSJT-X ON turns RADE OFF end to end.
+            try { if (!IsSetupFormNull && SetupForm.RADAE) SetupForm.RADAE = false; } catch { }
+            try { if (!IsSetupFormNull && SetupForm.RADAERX2) SetupForm.RADAERX2 = false; } catch { }
+            Thetis.WSJTX.WsjtManager.SetEnabled(true);
+            UpdateWsjtMenuItem();
+        }
+
         private void showHideDiversity(bool show, bool starting_up = false)
         {
             if (!RX2PreampPresent) return;
@@ -45617,6 +45824,10 @@ namespace Thetis
         {
             if (IsRightButton(e)) SetupForm.ShowSetupTab(Setup.SetupTab.FM_Tab);
         }
+        private void btnFreeDV_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (IsRightButton(e)) SetupForm.ShowSetupTab(Setup.SetupTab.RADE_Tab);
+        }
         private void comboAGC_MouseDown(object sender, MouseEventArgs e)
         {
             if (IsRightButton(e)) SetupForm.ShowSetupTab(Setup.SetupTab.ALCAGC_Tab);
@@ -46811,6 +47022,8 @@ namespace Thetis
                         setBandPanelVisible(false, false, true);
                         break;
                 }
+
+                if (ScanForm != null && !ScanForm.IsDisposed) ScanForm.UpdateBandScanRange(); // ke9ns add for the Scanner
             }
 
             //reset smeter pixel history //MW0LGE_21a

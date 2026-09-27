@@ -1487,6 +1487,26 @@ namespace Thetis
 
             chkForceATTwhenOutPowerChanges_decreased.Left = chkForceATTwhenOutPowerChanges.Right - chkForceATTwhenOutPowerChanges_decreased.Width;
             chkUndoAutoATTTx.Left = chkAutoATTTXPsOff.Right - chkUndoAutoATTTx.Width;
+
+            if (tcSetup.IsHandleCreated && tcSetup.TabCount > 0)
+            {
+                Rectangle rTab = tcSetup.GetTabRect(tcSetup.TabCount - 1);
+                int x = tcSetup.Left + rTab.Right + 6;
+                lblTXProfileWarning.Location = new Point(x, 2);
+
+                int needW = lblTXProfileWarning.Right + 10;
+                if (needW > ClientSize.Width)
+                {
+                    ClientSize = new Size(needW, ClientSize.Height);
+                    MaximumSize = Size;
+                    MinimumSize = Size;
+                }
+            }
+
+            btnApply.Left = ClientSize.Width - btnApply.Width - 10;
+            btnCancel.Left = btnApply.Left - btnCancel.Width - 6;
+            btnOK.Left = btnCancel.Left - btnOK.Width - 6;
+            labelSavingLoading.Left = ClientSize.Width - labelSavingLoading.Width - 10;
         }
         public new void Hide()
         {
@@ -1978,11 +1998,6 @@ namespace Thetis
             if (sortedList.Contains("comboRadioModel") && controls.ContainsKey("comboRadioModel"))
             {
                 string val = a["comboRadioModel"];
-                if (val != null && val.IndexOf("HERMES-LITE", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    val = "HERMES";
-                    a["comboRadioModel"] = val;
-                }
                 if (!comboRadioModel.Items.Contains(val))
                 {
                     DialogResult dr = MessageBox.Show($"The radio model stored in the database is not known by this version of SDR-VST3 [{val}]. \n\nAre you using the correct version ? It will be reset back to HERMES.",
@@ -3112,7 +3127,8 @@ namespace Thetis
 
             //options3 tab
             chkVFOsync_settings_changed(this, e);
-            chkMeshDiagLog_CheckedChanged(this, e); // MW0LGE_22x apply restored state to the runtime diag sink
+            chkMeshDiagLog.Checked = false; // MW0LGE_22x disabled
+            chkMeshDiagLog_CheckedChanged(this, e); // MW0LGE_22x force runtime diag sink off
 
             // auto start tab
             updateAutoLaunchControls();
@@ -3693,6 +3709,27 @@ namespace Thetis
 
                 if (DB.ConvertFromDBVal<string>(dr["CFCParaEQData"]) != CFCConfigForm.ConfigData) return true;
 
+                // RADE DSP settings
+                if (DB.ConvertFromDBVal<bool>(dr["RADE_Enabled"]) != chkRADAE.Checked) return true;
+                if (DB.ConvertFromDBVal<bool>(dr["RADE_EnabledRX2"]) != chkRADAERX2.Checked) return true;
+                if (DB.ConvertFromDBVal<int>(dr["RADE_VersionRX1"]) != cmbRX1RADEVersion.SelectedIndex) return true;
+                if (DB.ConvertFromDBVal<int>(dr["RADE_VersionRX2"]) != cmbRX2RADEVersion.SelectedIndex) return true;
+                if (DB.ConvertFromDBVal<decimal>(dr["RADE_MicLevel"]) != udRadaeMicLevel.Value) return true;
+                if (DB.ConvertFromDBVal<decimal>(dr["RADE_RxLevel"]) != udRadaeRxLevel.Value) return true;
+                if (DB.ConvertFromDBVal<decimal>(dr["RADE_RxLevelRX2"]) != udRadaeRxLevelRX2.Value) return true;
+                if (DB.ConvertFromDBVal<bool>(dr["RADE_MicRNNoise"]) != chkRadaeMicRNNoise.Checked) return true;
+                if (DB.ConvertFromDBVal<bool>(dr["RADE_MicAGC"]) != chkRadaeMicAGC.Checked) return true;
+                if (DB.ConvertFromDBVal<int>(dr["RADE_MicAGCTarget"]) != (int)udRadaeMicAGCTarget.Value) return true;
+                if (DB.ConvertFromDBVal<bool>(dr["RADE_MicEQ"]) != chkRadaeMicEQ.Checked) return true;
+                if (DB.ConvertFromDBVal<int>(dr["RADE_MicEQBassFreq"]) != (int)udRadaeMicEQBassFreq.Value) return true;
+                if (DB.ConvertFromDBVal<decimal>(dr["RADE_MicEQBassGain"]) != udRadaeMicEQBassGain.Value) return true;
+                if (DB.ConvertFromDBVal<int>(dr["RADE_MicEQMidFreq"]) != (int)udRadaeMicEQMidFreq.Value) return true;
+                if (DB.ConvertFromDBVal<decimal>(dr["RADE_MicEQMidGain"]) != udRadaeMicEQMidGain.Value) return true;
+                if (DB.ConvertFromDBVal<decimal>(dr["RADE_MicEQMidQ"]) != udRadaeMicEQMidQ.Value) return true;
+                if (DB.ConvertFromDBVal<int>(dr["RADE_MicEQTrebleFreq"]) != (int)udRadaeMicEQTrebleFreq.Value) return true;
+                if (DB.ConvertFromDBVal<decimal>(dr["RADE_MicEQTrebleGain"]) != udRadaeMicEQTrebleGain.Value) return true;
+                if (DB.ConvertFromDBVal<int>(dr["RADE_MicEQVol"]) != (int)udRadaeMicEQVol.Value) return true;
+
             }
 
             return false;
@@ -3880,6 +3917,27 @@ namespace Thetis
             Common.HightlightControl(udCFC7, bHighlight);
             Common.HightlightControl(udCFC8, bHighlight);
             Common.HightlightControl(udCFC9, bHighlight);
+
+            // RADE DSP settings
+            Common.HightlightControl(chkRADAE, bHighlight);
+            Common.HightlightControl(chkRADAERX2, bHighlight);
+            Common.HightlightControl(cmbRX1RADEVersion, bHighlight);
+            Common.HightlightControl(cmbRX2RADEVersion, bHighlight);
+            Common.HightlightControl(udRadaeMicLevel, bHighlight);
+            Common.HightlightControl(udRadaeRxLevel, bHighlight);
+            Common.HightlightControl(udRadaeRxLevelRX2, bHighlight);
+            Common.HightlightControl(chkRadaeMicRNNoise, bHighlight);
+            Common.HightlightControl(chkRadaeMicAGC, bHighlight);
+            Common.HightlightControl(udRadaeMicAGCTarget, bHighlight);
+            Common.HightlightControl(chkRadaeMicEQ, bHighlight);
+            Common.HightlightControl(udRadaeMicEQBassFreq, bHighlight);
+            Common.HightlightControl(udRadaeMicEQBassGain, bHighlight);
+            Common.HightlightControl(udRadaeMicEQMidFreq, bHighlight);
+            Common.HightlightControl(udRadaeMicEQMidGain, bHighlight);
+            Common.HightlightControl(udRadaeMicEQMidQ, bHighlight);
+            Common.HightlightControl(udRadaeMicEQTrebleFreq, bHighlight);
+            Common.HightlightControl(udRadaeMicEQTrebleGain, bHighlight);
+            Common.HightlightControl(udRadaeMicEQVol, bHighlight);
         }
 
         private void updateTXProfileInDB(DataRow dr)
@@ -4066,6 +4124,27 @@ namespace Thetis
                 dr["CFCEqFreq" + (i - 22).ToString()] = cfceq[i];
 
             dr["CFCParaEQData"] = CFCConfigForm.ConfigData;
+
+            // RADE DSP settings
+            dr["RADE_Enabled"] = chkRADAE.Checked;
+            dr["RADE_EnabledRX2"] = chkRADAERX2.Checked;
+            dr["RADE_VersionRX1"] = cmbRX1RADEVersion.SelectedIndex;
+            dr["RADE_VersionRX2"] = cmbRX2RADEVersion.SelectedIndex;
+            dr["RADE_MicLevel"] = udRadaeMicLevel.Value;
+            dr["RADE_RxLevel"] = udRadaeRxLevel.Value;
+            dr["RADE_RxLevelRX2"] = udRadaeRxLevelRX2.Value;
+            dr["RADE_MicRNNoise"] = chkRadaeMicRNNoise.Checked;
+            dr["RADE_MicAGC"] = chkRadaeMicAGC.Checked;
+            dr["RADE_MicAGCTarget"] = (int)udRadaeMicAGCTarget.Value;
+            dr["RADE_MicEQ"] = chkRadaeMicEQ.Checked;
+            dr["RADE_MicEQBassFreq"] = (int)udRadaeMicEQBassFreq.Value;
+            dr["RADE_MicEQBassGain"] = udRadaeMicEQBassGain.Value;
+            dr["RADE_MicEQMidFreq"] = (int)udRadaeMicEQMidFreq.Value;
+            dr["RADE_MicEQMidGain"] = udRadaeMicEQMidGain.Value;
+            dr["RADE_MicEQMidQ"] = udRadaeMicEQMidQ.Value;
+            dr["RADE_MicEQTrebleFreq"] = (int)udRadaeMicEQTrebleFreq.Value;
+            dr["RADE_MicEQTrebleGain"] = udRadaeMicEQTrebleGain.Value;
+            dr["RADE_MicEQVol"] = (int)udRadaeMicEQVol.Value;
         }
 
         public void SaveTXProfileData()
@@ -6650,7 +6729,6 @@ namespace Thetis
             }
 
             if (HardwareSpecific.Model == HPSDRModel.HERMES ||
-                HardwareSpecific.Model == HPSDRModel.HERMESLITE ||
                (HardwareSpecific.Model == HPSDRModel.HPSDR))
             {
                 tpAlexControl.Text = "Alex";
@@ -9854,6 +9932,36 @@ namespace Thetis
             CFCCOMPEQ = cfceq;
             CFCConfigForm.ConfigData = (string)dr["CFCParaEQData"];
 
+            // RADE DSP settings.  While the fldigi sidecar is running RADE
+            // must stay off, so a TX profile whose stored RADE bits are on is
+            // loaded RADE-cleared (and the in-memory row patched so the
+            // changed-check stays consistent -- the RADE kill the other way
+            // happens in chkRADAE_CheckedChanged if RADE is toggled manually).
+            if (Thetis.FLDIGI.FldigiManager.Enabled)
+            {
+                dr["RADE_Enabled"] = false;
+                dr["RADE_EnabledRX2"] = false;
+            }
+            chkRADAE.Checked = DB.ConvertFromDBVal<bool>(dr["RADE_Enabled"]);
+            chkRADAERX2.Checked = DB.ConvertFromDBVal<bool>(dr["RADE_EnabledRX2"]);
+            cmbRX1RADEVersion.SelectedIndex = Math.Min(Math.Max(DB.ConvertFromDBVal<int>(dr["RADE_VersionRX1"]), 0), Math.Max(cmbRX1RADEVersion.Items.Count - 1, 0));
+            cmbRX2RADEVersion.SelectedIndex = Math.Min(Math.Max(DB.ConvertFromDBVal<int>(dr["RADE_VersionRX2"]), 0), Math.Max(cmbRX2RADEVersion.Items.Count - 1, 0));
+            udRadaeMicLevel.Value = Math.Min(Math.Max(DB.ConvertFromDBVal<decimal>(dr["RADE_MicLevel"]), udRadaeMicLevel.Minimum), udRadaeMicLevel.Maximum);
+            udRadaeRxLevel.Value = Math.Min(Math.Max(DB.ConvertFromDBVal<decimal>(dr["RADE_RxLevel"]), udRadaeRxLevel.Minimum), udRadaeRxLevel.Maximum);
+            udRadaeRxLevelRX2.Value = Math.Min(Math.Max(DB.ConvertFromDBVal<decimal>(dr["RADE_RxLevelRX2"]), udRadaeRxLevelRX2.Minimum), udRadaeRxLevelRX2.Maximum);
+            chkRadaeMicRNNoise.Checked = DB.ConvertFromDBVal<bool>(dr["RADE_MicRNNoise"]);
+            chkRadaeMicAGC.Checked = DB.ConvertFromDBVal<bool>(dr["RADE_MicAGC"]);
+            udRadaeMicAGCTarget.Value = Math.Min(Math.Max(DB.ConvertFromDBVal<int>(dr["RADE_MicAGCTarget"]), udRadaeMicAGCTarget.Minimum), udRadaeMicAGCTarget.Maximum);
+            chkRadaeMicEQ.Checked = DB.ConvertFromDBVal<bool>(dr["RADE_MicEQ"]);
+            udRadaeMicEQBassFreq.Value = Math.Min(Math.Max(DB.ConvertFromDBVal<int>(dr["RADE_MicEQBassFreq"]), udRadaeMicEQBassFreq.Minimum), udRadaeMicEQBassFreq.Maximum);
+            udRadaeMicEQBassGain.Value = Math.Min(Math.Max(DB.ConvertFromDBVal<decimal>(dr["RADE_MicEQBassGain"]), udRadaeMicEQBassGain.Minimum), udRadaeMicEQBassGain.Maximum);
+            udRadaeMicEQMidFreq.Value = Math.Min(Math.Max(DB.ConvertFromDBVal<int>(dr["RADE_MicEQMidFreq"]), udRadaeMicEQMidFreq.Minimum), udRadaeMicEQMidFreq.Maximum);
+            udRadaeMicEQMidGain.Value = Math.Min(Math.Max(DB.ConvertFromDBVal<decimal>(dr["RADE_MicEQMidGain"]), udRadaeMicEQMidGain.Minimum), udRadaeMicEQMidGain.Maximum);
+            udRadaeMicEQMidQ.Value = Math.Min(Math.Max(DB.ConvertFromDBVal<decimal>(dr["RADE_MicEQMidQ"]), udRadaeMicEQMidQ.Minimum), udRadaeMicEQMidQ.Maximum);
+            udRadaeMicEQTrebleFreq.Value = Math.Min(Math.Max(DB.ConvertFromDBVal<int>(dr["RADE_MicEQTrebleFreq"]), udRadaeMicEQTrebleFreq.Minimum), udRadaeMicEQTrebleFreq.Maximum);
+            udRadaeMicEQTrebleGain.Value = Math.Min(Math.Max(DB.ConvertFromDBVal<decimal>(dr["RADE_MicEQTrebleGain"]), udRadaeMicEQTrebleGain.Minimum), udRadaeMicEQTrebleGain.Maximum);
+            udRadaeMicEQVol.Value = Math.Min(Math.Max(DB.ConvertFromDBVal<int>(dr["RADE_MicEQVol"]), udRadaeMicEQVol.Minimum), udRadaeMicEQVol.Maximum);
+
             chkAudioEnableVAC.Checked = (bool)dr["VAC1_On"];    // moved here after setting to off MW0LGE_21k9d
             chkAudioVACAutoEnable.Checked = (bool)dr["VAC1_Auto_On"]; //[2.10.1.0] MW0LGE moved here
             chkVAC2Enable.Checked = (bool)dr["VAC2_On"];    // moved here after setting to off MW0LGE_21k9d
@@ -9867,11 +9975,23 @@ namespace Thetis
 
         public int TCIClientsConnectedChange
         {
-            set { grpTCIServer.Text = "TCI Server (" + value.ToString() + " clients)"; }
+            set
+            {
+                if (IsDisposed || !IsHandleCreated || grpTCIServer.IsDisposed) return;
+                try { grpTCIServer.Text = "TCI Server (" + value.ToString() + " clients)"; }
+                catch (ObjectDisposedException) { }
+                catch (InvalidOperationException) { }
+            }
         }
         public int TCPIPcatClientsConnectedChange
         {
-            set { grpTCPIPcatServer.Text = "TCP / IP CAT Server (" + value.ToString() + " clients)"; }
+            set
+            {
+                if (IsDisposed || !IsHandleCreated || grpTCPIPcatServer.IsDisposed) return;
+                try { grpTCPIPcatServer.Text = "TCP / IP CAT Server (" + value.ToString() + " clients)"; }
+                catch (ObjectDisposedException) { }
+                catch (InvalidOperationException) { }
+            }
         }
         public void ForceTXProfileUpdate()
         {
@@ -14622,10 +14742,6 @@ namespace Thetis
                     }
                     break;
             }
-        }
-
-        private void btnN2ADRFilter_Click(object sender, EventArgs e)
-        {
         }
 
         private void btnPennyCtrlVHFReset_Click(object sender, EventArgs e)
@@ -19960,10 +20076,46 @@ namespace Thetis
             }
         }
 
+        private bool _gpuMeshSavedState = false;
+        private bool _gpuComputeSavedState = false;
+        private bool _gpuOverlaySavedState = false;
+
         private void chkForceCPURendering_CheckedChanged(object sender, EventArgs e)
         {
             if (initializing) return;
+
             Display.ForceCPURendering = chkForceCPURendering.Checked;
+
+            // forcing CPU rendering forces all GPU features to the CPU mode
+            if (chkForceCPURendering.Checked)
+            {
+                _gpuMeshSavedState = chkGpuMesh3D.Checked;
+                _gpuComputeSavedState = chkGpuComputeShaders.Checked;
+                _gpuOverlaySavedState = chkGpuOverlay.Checked;
+
+                chkGpuMesh3D.Checked = false;
+                chkGpuComputeShaders.Checked = false;
+                chkGpuOverlay.Checked = false;
+
+                chkGpuMesh3D.Enabled = false;
+                chkGpuComputeShaders.Enabled = false;
+                chkGpuOverlay.Enabled = false;
+
+                Display.GpuMeshEnabled = false;
+                Display.GpuComputeEnabled = false;
+                Display.GpuOverlayEnabled = false;
+            }
+            else
+            {
+                chkGpuMesh3D.Enabled = true;
+                chkGpuComputeShaders.Enabled = true;
+                chkGpuOverlay.Enabled = true;
+
+                chkGpuMesh3D.Checked = _gpuMeshSavedState;
+                chkGpuComputeShaders.Checked = _gpuComputeSavedState;
+                chkGpuOverlay.Checked = _gpuOverlaySavedState;
+            }
+
             console.RestartDisplayDX();
             if (_frm3DPanadapter != null && !_frm3DPanadapter.IsDisposed)
                 _frm3DPanadapter.ApplyRenderPathLimits();
@@ -19995,7 +20147,7 @@ namespace Thetis
 
         private void chkMeshDiagLog_CheckedChanged(object sender, EventArgs e)
         {
-            Common.MeshDiagLogEnabled = chkMeshDiagLog.Checked; // MW0LGE_22x runtime toggle, no restart needed
+            Common.MeshDiagLogEnabled = false; // MW0LGE_22x disabled - feature hidden/off
         }
 
         private void chkBlobPeakHold_CheckedChanged(object sender, EventArgs e)
@@ -20464,11 +20616,6 @@ namespace Thetis
             HPSDRModel new_model = HardwareSpecific.StringModelToEnum(comboRadioModel.Text);
             HardwareSpecific.Model = new_model;
 
-            chkApolloPresent.Text = "Apollo";
-            if (grpApolloCtrl != null) grpApolloCtrl.Text = "Apollo Control";
-            if (tpApolloApollo != null) tpApolloApollo.Text = "Apollo";
-            if (btnN2ADRFilter != null) btnN2ADRFilter.Visible = false;
-
             console.SetupForHPSDRModel();
 
             comboAudioSampleRateRX2.Enabled = true;
@@ -20481,10 +20628,6 @@ namespace Thetis
             switch (HardwareSpecific.Model)
             {
                 case HPSDRModel.HERMES:
-                    chkApolloPresent.Text = "Apollo";
-                    if (grpApolloCtrl != null) grpApolloCtrl.Text = "Apollo Control";
-                    if (tpApolloApollo != null) tpApolloApollo.Text = "Apollo";
-                    if (btnN2ADRFilter != null) btnN2ADRFilter.Visible = false;
                     chkAlexPresent.Enabled = true;
                     chkApolloPresent.Enabled = true;
                     pnlGeneralHardwareORION.Enabled = false;
@@ -21148,7 +21291,6 @@ namespace Thetis
             switch (HardwareSpecific.Model)
             {
                 case HPSDRModel.HERMES:
-                case HPSDRModel.HERMESLITE:
                 case HPSDRModel.ANAN_G2E: //N1GP G2E added
                 case HPSDRModel.ANAN10:
                 case HPSDRModel.ANAN10E:
@@ -21196,6 +21338,7 @@ namespace Thetis
             AM_Tab,
             FM_Tab,
             DSPAudio_Tab,
+            RADE_Tab,
             MNF_Tab,
             VOXDE_Tab,
             CFC_Tab,
@@ -21255,6 +21398,10 @@ namespace Thetis
                 case SetupTab.DSPAudio_Tab:
                     TabSetup.SelectedIndex = 3;
                     TabDSP.SelectedIndex = 5; // select DSP/Audio tab
+                    break;
+                case SetupTab.RADE_Tab:
+                    TabSetup.SelectedIndex = 3;
+                    TabDSP.SelectedIndex = 12; // select DSP/RADE tab
                     break;
                 case SetupTab.MNF_Tab:
                     TabSetup.SelectedIndex = 3;
@@ -21327,7 +21474,6 @@ namespace Thetis
             switch (HardwareSpecific.Model)
             {
                 case HPSDRModel.HERMES:
-                case HPSDRModel.HERMESLITE:
                 case HPSDRModel.ANAN_G2E: //N1GP G2E added
                 case HPSDRModel.ANAN10:
                 case HPSDRModel.ANAN10E:
@@ -21358,7 +21504,6 @@ namespace Thetis
             switch (HardwareSpecific.Model)
             {
                 case HPSDRModel.HERMES:
-                case HPSDRModel.HERMESLITE:
                 case HPSDRModel.ANAN_G2E: //N1GP G2E added
                 case HPSDRModel.ANAN10:
                 case HPSDRModel.ANAN10E:
@@ -24343,7 +24488,6 @@ namespace Thetis
                         }
                         break;
                     case HPSDRModel.HERMES:
-                    case HPSDRModel.HERMESLITE:
                         for (int n = (int)Band.B160M; n <= (int)Band.B6M; n++)
                         {
                             Band b = (Band)n;
@@ -33832,6 +33976,15 @@ namespace Thetis
             }
             catch { }
             try { if (console != null) console.NotifyRadaeEnabledChanged(1, chkRADAE.Checked); } catch { }
+            // Mutual exclusion with the fldigi sidecar (toggled from the main
+            // console menu): whichever modem is enabled last wins.  The FreeDV
+            // button and TX-profile recall both reach this point via the
+            // chkRADAE setter, so this is the single choke point for RADE.
+            if (chkRADAE.Checked && Thetis.FLDIGI.FldigiManager.Enabled)
+            {
+                try { Thetis.FLDIGI.FldigiManager.SetEnabled(false); } catch { }
+                try { if (console != null) console.UpdateFldigiMenuItem(); } catch { }
+            }
         }
 
         private void chkRADAERX2_CheckedChanged(object sender, EventArgs e)
@@ -37790,7 +37943,7 @@ namespace Thetis
                     NetworkIO.SelectedRadioProtocol = RadioProtocol.ETH;
                     break;
                 default:
-                    NetworkIO.SelectedRadioProtocol = RadioProtocol.ETH;
+                    NetworkIO.SelectedRadioProtocol = RadioProtocol.ETH; //eek
                     break;
             }
 
