@@ -72,6 +72,7 @@ namespace Thetis
 
         private const uint OBJID_CLIENT = 0xFFFFFFFC;
         private const uint BM_CLICK = 0x00F5;
+        private const int UIA_LegacyIAccessiblePatternId = 10018;
 
         [DllImport("oleacc.dll")]
         private static extern int AccessibleObjectFromWindow(IntPtr hwnd, uint dwObjectID, ref Guid riid,
@@ -755,8 +756,8 @@ namespace Thetis
             }
         }
 
-        private static readonly string[] ResetIds = { "reset_button", "Reset", "reset" };
-        private static readonly string[] ResetNames = { "Reset", "RESET" };
+        private static readonly string[] ResetIds = { "reset_button" };
+        private static readonly string[] ResetNames = { "Reset", "RESET", "Rst", "RST", "Сброс" };
         private static readonly string[] BypassIds = { "byPass_button", "ByPass", "byPass" };
         private static readonly string[] BypassNames = { "Bypass", "ByPass", "BYPASS" };
         private static readonly string[] CoolingIds = { "cooling_button", "Cooling" };
@@ -928,10 +929,24 @@ namespace Thetis
             {
                 dynamic el = FindHeliosUiaElement(automationIds, names);
                 if (el == null) return false;
-                dynamic pat = el.GetCurrentPattern(UIA_InvokePatternId);
-                if (pat == null) return false;
-                pat.Invoke();
-                return true;
+                try
+                {
+                    dynamic inv = el.GetCurrentPattern(UIA_InvokePatternId);
+                    if (inv != null) { inv.Invoke(); return true; }
+                }
+                catch { }
+                try
+                {
+                    dynamic tog = el.GetCurrentPattern(UIA_TogglePatternId);
+                    if (tog != null) { tog.Toggle(); return true; }
+                }
+                catch { }
+                try
+                {
+                    dynamic acc = el.GetCurrentPattern(UIA_LegacyIAccessiblePatternId);
+                    if (acc != null) { acc.DoDefaultAction(); return true; }
+                }
+                catch { }
             }
             catch { }
             return false;
