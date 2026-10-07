@@ -137,6 +137,9 @@ namespace Thetis
         private LabelTS lblSwrValue;
         private LabelTS lblVoltsValue;
         private PanelTS pnlFan;
+        private LabelTS lblBandCaption;
+        private LabelTS lblBandValue;
+        private ButtonTS btnReset;
         private ButtonTS btnBypass;
         private ButtonTS btnCooling;
         private int _lastHeliosClickTick;
@@ -155,7 +158,7 @@ namespace Thetis
         private void BuildUi()
         {
             Name = "ucHeliosDx";
-            Size = new Size(380, 590);
+            Size = new Size(430, 590);
             MinimumSize = new Size(260, 36);
             BorderStyle = BorderStyle.FixedSingle;
             BackColor = Color.FromArgb(32, 32, 32);
@@ -334,9 +337,28 @@ namespace Thetis
             {
                 AutoSize = false,
                 Location = new Point(170, 22),
-                Size = new Size(90, 36),
+                Size = new Size(56, 36),
                 Text = "--V",
                 Font = new Font("Consolas", 20f, FontStyle.Bold),
+                ForeColor = Color.Lime,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            lblBandCaption = new LabelTS
+            {
+                AutoSize = false,
+                Location = new Point(228, 6),
+                Size = new Size(52, 18),
+                Text = "BAND",
+                ForeColor = Color.Gray,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            lblBandValue = new LabelTS
+            {
+                AutoSize = false,
+                Location = new Point(224, 22),
+                Size = new Size(56, 36),
+                Text = "--",
+                Font = new Font("Consolas", 18f, FontStyle.Bold),
                 ForeColor = Color.Lime,
                 TextAlign = ContentAlignment.MiddleLeft
             };
@@ -348,6 +370,7 @@ namespace Thetis
                 Visible = false
             };
             pnlFan.Paint += PnlFan_Paint;
+            btnReset = MakeMeterButton("RST", BtnReset_Click);
             btnBypass = MakeMeterButton("BYP", BtnBypass_Click);
             btnCooling = MakeMeterButton("COOL", BtnCooling_Click);
 
@@ -357,7 +380,10 @@ namespace Thetis
             pnlMeters.Controls.Add(lblSwrCaption);
             pnlMeters.Controls.Add(lblSwrValue);
             pnlMeters.Controls.Add(lblVoltsValue);
+            pnlMeters.Controls.Add(lblBandCaption);
+            pnlMeters.Controls.Add(lblBandValue);
             pnlMeters.Controls.Add(pnlFan);
+            pnlMeters.Controls.Add(btnReset);
             pnlMeters.Controls.Add(btnBypass);
             pnlMeters.Controls.Add(btnCooling);
             pnlMeters.Resize += PnlMeters_Resize;
@@ -495,7 +521,7 @@ namespace Thetis
             else
             {
                 _collapsed = false;
-                Size = _expandedSize.Width > 0 ? _expandedSize : new Size(380, 520);
+                Size = _expandedSize.Width > 0 ? _expandedSize : new Size(430, 520);
                 btnCollapse.Text = "–";
                 FitEmbeddedWindow();
             }
@@ -673,9 +699,10 @@ namespace Thetis
         private void PnlMeters_Resize(object sender, EventArgs e)
         {
             int w = 46;
-            btnCooling.Location = new Point(Math.Max(220, pnlMeters.ClientSize.Width - w - 6), 12);
+            btnCooling.Location = new Point(Math.Max(270, pnlMeters.ClientSize.Width - w - 6), 12);
             btnBypass.Location = new Point(btnCooling.Left - 4 - w, 12);
-            int right = btnBypass.Left - 6;
+            btnReset.Location = new Point(btnBypass.Left - 4 - w, 12);
+            int right = btnReset.Left - 6;
             if (pnlFan.Visible)
             {
                 pnlFan.Location = new Point(right - 20, 30);
@@ -684,18 +711,25 @@ namespace Thetis
 
             lblPwrCaption.Location = new Point(8, 6);
             lblPwrValue.Location = new Point(6, 22);
-            lblPwrValue.Width = 72;
+            lblPwrValue.Width = 64;
             lblPwrUnit.Location = new Point(lblPwrValue.Right + 2, 30);
 
-            int swrLeft = lblPwrUnit.Right + 12;
+            int swrLeft = lblPwrUnit.Right + 8;
             lblSwrCaption.Location = new Point(swrLeft, 6);
-            lblSwrCaption.Size = new Size(48, 18);
+            lblSwrCaption.Size = new Size(40, 18);
             lblSwrValue.Location = new Point(swrLeft, 22);
-            lblSwrValue.Width = 64;
+            lblSwrValue.Width = 56;
 
-            int voltsLeft = lblSwrValue.Right + 8;
+            int voltsLeft = lblSwrValue.Right + 6;
             lblVoltsValue.Location = new Point(voltsLeft, 22);
-            lblVoltsValue.Size = new Size(Math.Max(48, right - voltsLeft), 36);
+            lblVoltsValue.Size = new Size(52, 36);
+
+            int bandLeft = lblVoltsValue.Right + 4;
+            int bandW = Math.Max(40, right - bandLeft);
+            lblBandCaption.Location = new Point(bandLeft, 6);
+            lblBandCaption.Size = new Size(bandW, 18);
+            lblBandValue.Location = new Point(bandLeft, 22);
+            lblBandValue.Size = new Size(bandW, 36);
         }
 
         private void PnlFan_Paint(object sender, PaintEventArgs e)
@@ -721,10 +755,18 @@ namespace Thetis
             }
         }
 
+        private static readonly string[] ResetIds = { "reset_button", "Reset", "reset" };
+        private static readonly string[] ResetNames = { "Reset", "RESET" };
         private static readonly string[] BypassIds = { "byPass_button", "ByPass", "byPass" };
         private static readonly string[] BypassNames = { "Bypass", "ByPass", "BYPASS" };
         private static readonly string[] CoolingIds = { "cooling_button", "Cooling" };
         private static readonly string[] CoolingNames = { "Cooling", "Cool" };
+
+        private void BtnReset_Click(object sender, EventArgs e)
+        {
+            if (ClickHeliosControl(ResetIds, ResetNames, "Reset"))
+                ScheduleModeSync();
+        }
 
         private void BtnBypass_Click(object sender, EventArgs e)
         {
@@ -1078,7 +1120,7 @@ namespace Thetis
         {
             if (!_embedded || !IsWindow(_heliosHwnd))
             {
-                SetMeterTexts("----", "--.--", "", "--", false, Color.Gray, Color.Gray, Color.Gray);
+                SetMeterTexts("----", "--.--", GetThetisBandLabel(), "--", false, Color.Gray, Color.Gray, Color.Gray);
                 return;
             }
 
@@ -1123,7 +1165,8 @@ namespace Thetis
                 volts = CleanVolts(volts);
 
             string band = GetHeliosBandLabel();
-            if (IsPlaceholderBand(band)) band = "";
+            if (IsPlaceholderBand(band) || IsHeliosModeLabel(band))
+                band = GetThetisBandLabel();
 
             SetMeterTexts(pwr, swr, band, volts, fanOn, pwrColor, swrColor, voltsColor);
         }
@@ -1202,13 +1245,37 @@ namespace Thetis
             return false;
         }
 
+        private static bool IsHeliosModeLabel(string band)
+        {
+            if (string.IsNullOrEmpty(band)) return true;
+            if (band.IndexOf("pass", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (band.IndexOf("cool", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (string.Equals(band.Trim(), "Operate", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        private string GetThetisBandLabel()
+        {
+            try
+            {
+                if (_console == null) return "";
+                string s = BandStackManager.BandToString(_console.RX1Band);
+                if (string.IsNullOrEmpty(s) || string.Equals(s, "GEN", StringComparison.OrdinalIgnoreCase))
+                    return "";
+                return s;
+            }
+            catch { return ""; }
+        }
+
         private void SetMeterTexts(string pwr, string swr, string band, string volts, bool fanOn,
             Color pwrColor, Color swrColor, Color voltsColor)
         {
             if (lblPwrValue.Text != pwr) lblPwrValue.Text = pwr;
             if (lblSwrValue.Text != swr) lblSwrValue.Text = swr;
-            string bandVolts = string.IsNullOrEmpty(band) ? volts + "V" : band + "  " + volts + "V";
-            if (lblVoltsValue.Text != bandVolts) lblVoltsValue.Text = bandVolts;
+            string voltsText = volts + "V";
+            if (lblVoltsValue.Text != voltsText) lblVoltsValue.Text = voltsText;
+            string bandText = string.IsNullOrEmpty(band) ? "--" : band;
+            if (lblBandValue.Text != bandText) lblBandValue.Text = bandText;
             if (lblPwrValue.ForeColor != pwrColor) lblPwrValue.ForeColor = pwrColor;
             if (lblSwrValue.ForeColor != swrColor) lblSwrValue.ForeColor = swrColor;
             if (lblVoltsValue.ForeColor != voltsColor) lblVoltsValue.ForeColor = voltsColor;
