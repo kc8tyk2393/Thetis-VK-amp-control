@@ -136,6 +136,7 @@ namespace Thetis
         private LabelTS lblPwrUnit;
         private LabelTS lblSwrCaption;
         private LabelTS lblSwrValue;
+        private LabelTS lblVoltsCaption;
         private LabelTS lblVoltsValue;
         private PanelTS pnlFan;
         private LabelTS lblBandCaption;
@@ -334,12 +335,21 @@ namespace Thetis
                 ForeColor = Color.Lime,
                 TextAlign = ContentAlignment.MiddleLeft
             };
+            lblVoltsCaption = new LabelTS
+            {
+                AutoSize = false,
+                Location = new Point(170, 6),
+                Size = new Size(56, 18),
+                Text = "VOLTS",
+                ForeColor = Color.Gray,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
             lblVoltsValue = new LabelTS
             {
                 AutoSize = false,
                 Location = new Point(170, 22),
-                Size = new Size(56, 36),
-                Text = "--V",
+                Size = new Size(80, 36),
+                Text = "--.-",
                 Font = new Font("Consolas", 20f, FontStyle.Bold),
                 ForeColor = Color.Lime,
                 TextAlign = ContentAlignment.MiddleLeft
@@ -380,6 +390,7 @@ namespace Thetis
             pnlMeters.Controls.Add(lblPwrUnit);
             pnlMeters.Controls.Add(lblSwrCaption);
             pnlMeters.Controls.Add(lblSwrValue);
+            pnlMeters.Controls.Add(lblVoltsCaption);
             pnlMeters.Controls.Add(lblVoltsValue);
             pnlMeters.Controls.Add(lblBandCaption);
             pnlMeters.Controls.Add(lblBandValue);
@@ -721,11 +732,13 @@ namespace Thetis
             lblSwrValue.Location = new Point(swrLeft, 22);
             lblSwrValue.Width = 56;
 
-            int voltsLeft = lblSwrValue.Right + 6;
+            int voltsLeft = lblSwrValue.Right + 10;
+            lblVoltsCaption.Location = new Point(voltsLeft, 6);
+            lblVoltsCaption.Size = new Size(72, 18);
             lblVoltsValue.Location = new Point(voltsLeft, 22);
-            lblVoltsValue.Size = new Size(52, 36);
+            lblVoltsValue.Size = new Size(80, 36);
 
-            int bandLeft = lblVoltsValue.Right + 4;
+            int bandLeft = lblVoltsValue.Right + 8;
             int bandW = Math.Max(40, right - bandLeft);
             lblBandCaption.Location = new Point(bandLeft, 6);
             lblBandCaption.Size = new Size(bandW, 18);
@@ -1243,8 +1256,6 @@ namespace Thetis
             if (double.TryParse(volts, System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out double v))
             {
-                if (Math.Abs(v - Math.Round(v)) < 0.05)
-                    return ((int)Math.Round(v)).ToString();
                 return v.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
             }
             return volts;
@@ -1287,8 +1298,7 @@ namespace Thetis
         {
             if (lblPwrValue.Text != pwr) lblPwrValue.Text = pwr;
             if (lblSwrValue.Text != swr) lblSwrValue.Text = swr;
-            string voltsText = volts + "V";
-            if (lblVoltsValue.Text != voltsText) lblVoltsValue.Text = voltsText;
+            if (lblVoltsValue.Text != volts) lblVoltsValue.Text = volts;
             string bandText = string.IsNullOrEmpty(band) ? "--" : band;
             if (lblBandValue.Text != bandText) lblBandValue.Text = bandText;
             if (lblPwrValue.ForeColor != pwrColor) lblPwrValue.ForeColor = pwrColor;
