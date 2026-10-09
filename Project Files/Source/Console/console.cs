@@ -156,6 +156,7 @@ namespace Thetis
 
         public RAForm raForm;
         public ucHeliosDx heliosDxBox;
+        public ucVkAmps vkAmpsBox;
         public Path_Illustrator path_Illustrator;
 
         public MemoryForm memoryForm;
@@ -772,6 +773,7 @@ namespace Thetis
 
             InitialiseAndromedaMenus();
             InitialiseHeliosDxMenu();
+            InitialiseVkAmpsMenu();
 
             //
             ucQuickRecallPad.console = this;
@@ -3395,6 +3397,8 @@ namespace Thetis
             DB.SaveVars("State", a, true);
             if (heliosDxBox != null && !heliosDxBox.IsDisposed)
                 heliosDxBox.SaveState();
+            if (vkAmpsBox != null && !vkAmpsBox.IsDisposed)
+                vkAmpsBox.SaveState();
         }
 
         //        public void SaveState()
@@ -28701,6 +28705,7 @@ namespace Thetis
             if (memoryForm != null) memoryForm.Hide();
             if (diversityForm != null) diversityForm.Hide();
             if (heliosDxBox != null && !heliosDxBox.IsDisposed) heliosDxBox.Visible = false;
+            if (vkAmpsBox != null && !vkAmpsBox.IsDisposed) vkAmpsBox.Visible = false;
 
             if (psform != null) psform.Hide();
             if (m_frmNotchPopup != null) m_frmNotchPopup.Hide();
@@ -28762,6 +28767,10 @@ namespace Thetis
             if (heliosDxBox != null && !heliosDxBox.IsDisposed)
             {
                 heliosDxBox.SaveAndCloseHost();
+            }
+            if (vkAmpsBox != null && !vkAmpsBox.IsDisposed)
+            {
+                vkAmpsBox.SaveAndCloseHost();
             }
 
             if (psform != null) psform.Close();
@@ -40319,6 +40328,8 @@ namespace Thetis
 
             if (heliosDxBox != null && !heliosDxBox.IsDisposed)
                 heliosDxBox.KeepOnConsole();
+            if (vkAmpsBox != null && !vkAmpsBox.IsDisposed)
+                vkAmpsBox.KeepOnConsole();
 
             if (this.WindowState != _old_window_state)
             {
@@ -44328,6 +44339,38 @@ namespace Thetis
         public void ShowHeliosDxForm()
         {
             ShowHeliosDxBox();
+        }
+
+        private void InitialiseVkAmpsMenu()
+        {
+            ToolStripMenuItem item = new ToolStripMenuItem("VK3");
+            item.Name = "vkAmpsToolStripMenuItem";
+            item.ForeColor = SystemColors.ControlLightLight;
+            item.Click += (s, e) => ShowVkAmpsBox();
+            int heliosIndex = menuStrip1.Items.IndexOfKey("heliosDxToolStripMenuItem");
+            if (heliosIndex >= 0)
+                menuStrip1.Items.Insert(heliosIndex + 1, item);
+            else
+            {
+                int raIndex = menuStrip1.Items.IndexOf(RAtoolStripMenuItem);
+                if (raIndex >= 0)
+                    menuStrip1.Items.Insert(raIndex + 1, item);
+                else
+                    menuStrip1.Items.Add(item);
+            }
+        }
+
+        public void ShowVkAmpsBox()
+        {
+            if (vkAmpsBox == null || vkAmpsBox.IsDisposed)
+            {
+                vkAmpsBox = new ucVkAmps(this);
+                vkAmpsBox.Location = new Point(20, 80);
+                vkAmpsBox.Visible = false;
+                this.Controls.Add(vkAmpsBox);
+                vkAmpsBox.RestoreState();
+            }
+            vkAmpsBox.ShowBox();
         }
 
         private void RAtoolStripMenuItem_Click(object sender, EventArgs e)
@@ -49603,6 +49646,7 @@ namespace Thetis
                 case "diversity": showHideDiversity(true); break;
                 case "ra": RAtoolStripMenuItem_Click(this, e); break;
                 case "helios": ShowHeliosDxBox(); break;
+                case "vk3": ShowVkAmpsBox(); break;
                 case "wb": wBToolStripMenuItem_Click(this, e); break;
                 case "finder": finderMenuItem_Click(this, e); break;
                 case "bandstack": lblBandStack_Click(this, e); break;
@@ -52947,6 +52991,7 @@ namespace Thetis
                 case OtherButtonId.FORM_LINEARITY: linearityToolStripMenuItem_Click(this, EventArgs.Empty); break;
                 case OtherButtonId.FORM_WB: wBToolStripMenuItem_Click(this, EventArgs.Empty); break;
                 case OtherButtonId.FORM_HELIOSDX: ShowHeliosDxBox(); break;
+                case OtherButtonId.FORM_VKAMPS: ShowVkAmpsBox(); break;
 
                 case OtherButtonId.CWX_KEY: CWXForm.KeyAction(); break;
                 case OtherButtonId.CWX_STOP: CWXForm.StopAction(); break;

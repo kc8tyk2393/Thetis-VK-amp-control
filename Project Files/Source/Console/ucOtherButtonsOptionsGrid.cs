@@ -254,7 +254,8 @@ namespace Thetis
 
         INIT = 1000,
 
-        UNKNOWN = 2000
+        UNKNOWN = 2000,
+        FORM_VKAMPS = 2001
     }
 
     [Serializable]
@@ -695,6 +696,7 @@ namespace Thetis
             (OtherButtonId.FORM_LINEARITY, 9, 9, "Linearity", "", "", "Show linearity form"),
             (OtherButtonId.FORM_WB,        9, 10, "Wideband", "", "", "Show wideband"),
             (OtherButtonId.FORM_HELIOSDX,  9,  7, "Helios DX", "", "", "Show Helios DX amp control"),
+            (OtherButtonId.FORM_VKAMPS,    9, 11, "VK3", "", "", "Show VK3 amp control"),
 
             (OtherButtonId.INFO_TEXT,     -1, -1, "CWX", "", "", ""),
             (OtherButtonId.SPLITTER,      -1, -1, "", "", "", ""),

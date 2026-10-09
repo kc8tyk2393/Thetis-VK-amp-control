@@ -1297,20 +1297,55 @@ namespace Thetis
             comboGanymedeCATPort.Items.AddRange(com_ports);
         }
         private string _skinPath = "";
+
+        private static string AppDataSkinsFolder()
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenHPSDR", "Skins");
+        }
+
+        private static string[] SkinFolders()
+        {
+            return new[]
+            {
+                Path.Combine(Application.StartupPath, "Skins"),
+                AppDataSkinsFolder()
+            };
+        }
+
+        private string FolderForSkin(string skinName)
+        {
+            if (string.IsNullOrEmpty(skinName)) return "";
+            foreach (string root in SkinFolders())
+            {
+                try
+                {
+                    if (Directory.Exists(Path.Combine(root, skinName)))
+                        return root;
+                }
+                catch { }
+            }
+            return "";
+        }
+
         private void RefreshSkinList()
         {
             comboAppSkin.Items.Clear();
             btnRemoveSkin.Enabled = false;
 
-            string path = ".\\Skins\\";
-            if (Directory.Exists(path))
-                path = ".\\Skins\\";
-            else
-                path = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
-                    "\\OpenHPSDR\\Skins";
-            _skinPath = path;
+            var names = new List<string>();
+            foreach (string root in SkinFolders())
+            {
+                if (!Directory.Exists(root)) continue;
+                foreach (string d in Directory.GetDirectories(root))
+                {
+                    string s = Path.GetFileName(d);
+                    if (string.IsNullOrEmpty(s) || s.StartsWith(".")) continue;
+                    if (!names.Contains(s))
+                        names.Add(s);
+                }
+            }
 
-            if (!Directory.Exists(path))
+            if (names.Count == 0)
             {
                 MessageBox.Show("The console presentation files (skins) were not found.\n" +
                     "Appearance will suffer until this is rectified.\n",
@@ -1320,24 +1355,13 @@ namespace Thetis
                 return;
             }
 
-            foreach (string d in Directory.GetDirectories(path))
-            {
-                string s = d.Substring(d.LastIndexOf("\\") + 1);
-                if (!s.StartsWith("."))
-                    comboAppSkin.Items.Add(d.Substring(d.LastIndexOf("\\") + 1));
-            }
+            names.Sort(StringComparer.CurrentCultureIgnoreCase);
+            comboAppSkin.Items.AddRange(names.ToArray());
+            _skinPath = FolderForSkin(comboAppSkin.Text);
+            if (_skinPath == "")
+                _skinPath = Directory.Exists(AppDataSkinsFolder()) ? AppDataSkinsFolder() : Path.Combine(Application.StartupPath, "Skins");
 
             btnRemoveSkin.Enabled = comboAppSkin.Items.Count > 1;
-
-            if (comboAppSkin.Items.Count == 0)
-            {
-                MessageBox.Show("The console presentation files (skins) were not found.\n" +
-                    "Appearance will suffer until this is rectified.\n",
-                    "Skins files not found",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error, MessageBoxDefaultButton.Button1, Common.MB_TOPMOST); //MW0LGE_[2.9.0.7]);
-                return;
-            }
         }
         private void selectSkin()
         {
@@ -13143,16 +13167,11 @@ namespace Thetis
             Cursor c = Cursor.Current;
             Cursor.Current = Cursors.WaitCursor;
 
-            string path = ".\\Skins\\";
-            if (!Directory.Exists(path + comboAppSkin.Text))
-                path = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
-                        "\\OpenHPSDR\\Skins";
-
-            if (_skinPath == "") _skinPath = path;
-
-            if (Directory.Exists(_skinPath + "\\" + comboAppSkin.Text))
+            string root = FolderForSkin(comboAppSkin.Text);
+            if (root != "")
             {
-                Skin.Restore(comboAppSkin.Text, _skinPath, console);
+                _skinPath = root;
+                Skin.Restore(comboAppSkin.Text, root, console);
                 console.UpdateAndromedaSkins();
             }
 
@@ -29075,7 +29094,8 @@ namespace Thetis
                 // change skin
                 comboAppSkin.SelectedIndex = nToSelect;
 
-                string sSkinPath = _skinPath + "\\" + sSelectedSkin;
+                string sSkinRoot = FolderForSkin(sSelectedSkin);
+                string sSkinPath = sSkinRoot == "" ? "" : Path.Combine(sSkinRoot, sSelectedSkin);
 
                 try
                 {
@@ -29104,8 +29124,10 @@ namespace Thetis
         {
             try
             {
-                if (_skinPath != "")
-                    Process.Start("explorer.exe", _skinPath);
+                string root = FolderForSkin(comboAppSkin.Text);
+                if (root == "") root = Directory.Exists(AppDataSkinsFolder()) ? AppDataSkinsFolder() : _skinPath;
+                if (root != "")
+                    Process.Start("explorer.exe", root);
             }
             catch (Exception)
             {

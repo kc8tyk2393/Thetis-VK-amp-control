@@ -485,6 +485,9 @@
     <Compile Include="ucHeliosDx.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="ucVkAmps.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="radio.cs">
       <SubType>Code</SubType>
     </Compile>
