@@ -1117,10 +1117,9 @@ namespace Thetis
         }
         public void RxAfGainChanged(int rx, bool is_subrx, int gain)
         {
-            if (m_disconnected) return;
-            int chan = is_subrx ? 1 : 0;
-            double db = audioGainToDb(gain / 100f);
-            sendRxVolume(rx - 1, chan, db);
+            // The local RX AF slider changes the speaker only.  TCI clients
+            // keep a fixed receive level, so this is not reported as rx_volume.
+            if (rx < 0 || is_subrx || gain < 0) return;
         }
         public void CTUNChanged(int rx, bool enabled)
         {
@@ -2550,14 +2549,12 @@ namespace Thetis
             sendRxNfEnable(0, consoleThreadSafe.GetMNF(1));
             sendRxNfEnable(1, consoleThreadSafe.GetMNF(2));
 
-            double rx1vol = audioGainToDb(consoleThreadSafe.RX0Gain / 100f);
-            double rx1Subvol = audioGainToDb(consoleThreadSafe.RX1Gain / 100f);
-            double rx2vol = audioGainToDb(consoleThreadSafe.RX2Gain / 100f);
-
-            sendRxVolume(0, 0, rx1vol);
-            sendRxVolume(0, 1, rx1Subvol);
-            sendRxVolume(1, 0, rx2vol);
-            sendRxVolume(1, 1, rx2vol);
+            // TCI receive audio is full scale.  Tell clients unity so they
+            // do not copy the local RX AF slider onto their own playback.
+            sendRxVolume(0, 0, 0.0);
+            sendRxVolume(0, 1, 0.0);
+            sendRxVolume(1, 0, 0.0);
+            sendRxVolume(1, 1, 0.0);
             sendRxBalance(0, 0, 40.0 - (consoleThreadSafe.GetBal(1, false) * 0.8));
             sendRxBalance(0, 1, 40.0 - (consoleThreadSafe.GetBal(1, true) * 0.8));
             sendRxBalance(1, 0, 40.0 - (consoleThreadSafe.GetBal(2, false) * 0.8));
@@ -4788,32 +4785,11 @@ namespace Thetis
             if (!int.TryParse(args[1], out int chan)) return;
             if (chan < 0 || chan > 1) return;
 
-            int vol = 0;
-
             if (args.Length == 2)
             {
-                //get
-                switch (rx + 1)
-                {
-                    case 1:
-                        if (chan == 0)
-                        {
-                            vol = consoleThreadSafe.RX0Gain; // such horrible naming
-                        }
-                        else if (chan == 1)
-                        {
-                            vol = consoleThreadSafe.RX1Gain;
-                        }
-                        else
-                            return;
-                        break;
-                    case 2:
-                        vol = consoleThreadSafe.RX2Gain; // no sub
-                        break;
-                }
-                double perc = vol / 100f;
-                double db = audioGainToDb(perc);
-                sendRxVolume(rx, chan, db);
+                // TCI receive level is fixed.  A query does not return the local RX AF slider.
+                if (rx == 0 && chan > 1) return;
+                sendRxVolume(rx, chan, 0.0);
             }
             else
             {

@@ -1105,19 +1105,29 @@ namespace Thetis
 				{
                     if (value != rx_output_gain_dsp || force)
 					{
-                        WDSP.SetRXAPanelGain1(WDSP.id(thread, subrx), value);
+                        int channel = WDSP.id(thread, subrx);
+                        // Keep the DSP output at unity so TCI receive audio for
+                        // third-party apps does not follow the RX AF slider.
+                        // The slider still sets the speaker mixer level.
+                        WDSP.SetRXAPanelGain1(channel, 1.0);
+                        unsafe
+                        {
+                            cmaster.SetAAudioMixVol((void*)0, 0, channel, value);
+                        }
 						rx_output_gain_dsp = value;
 
                         //[2.10.3.5]MW0LGE wave recorder volume normalise
-                        switch(WDSP.id(thread, subrx))
+                        switch(channel)
                         {
                             case 0: //rx1 sub0
                                 if (WaveThing.wave_file_writer[0] != null)
                                     WaveThing.wave_file_writer[0].RecordGain = (float)value;
+                                ivac.SetIVACrxscale(0, Audio.VACRXScale * value);
                                 break;
                             case 2: //rx2 sub0
                                 if (WaveThing.wave_file_writer[1] != null)
                                     WaveThing.wave_file_writer[1].RecordGain = (float)value;
+                                ivac.SetIVACrxscale(1, Audio.VAC2RXScale * value);
                                 break;
                         }
                     }

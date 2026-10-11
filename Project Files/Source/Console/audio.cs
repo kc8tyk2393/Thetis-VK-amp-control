@@ -770,7 +770,10 @@ namespace Thetis
             set
             {
                 vac_rx_scale = value;
-                ivac.SetIVACrxscale(0, value);
+                double rx1 = 1.0;
+                if (console != null && console.radio != null)
+                    rx1 = console.radio.GetDSPRX(0, 0).RXOutputGain;
+                ivac.SetIVACrxscale(0, value * rx1);
             }
         }
 
@@ -781,7 +784,10 @@ namespace Thetis
             set
             {
                 vac2_rx_scale = value;
-                ivac.SetIVACrxscale(1, value);
+                double rx2 = 1.0;
+                if (console != null && console.radio != null)
+                    rx2 = console.radio.GetDSPRX(1, 0).RXOutputGain;
+                ivac.SetIVACrxscale(1, value * rx2);
             }
         }
 
