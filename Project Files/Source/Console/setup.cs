@@ -112,6 +112,17 @@ namespace Thetis
         private LabelTS lblPHROTAsymIn;
         private LabelTS lblPHROTAsymOut;
         private LabelTS lblPHROTFc;
+        // NR5 (NNR) tuning tab, built programmatically in InitNnrControls()
+        private TabPage tpDSPNR5;
+        private NumericUpDownTS[] nudNR5_model;
+        private NumericUpDownTS[] nudNR5_floor;
+        private NumericUpDownTS[] nudNR5_maxgain;
+        private NumericUpDownTS[] nudNR5_alpha;
+        private NumericUpDownTS[] nudNR5_knee;
+        private NumericUpDownTS[] nudNR5_tau;
+        private NumericUpDownTS[] nudNR5_smooth_att;
+        private NumericUpDownTS[] nudNR5_smooth_rel;
+        private CheckBoxTS[] chkNR5_cmode;
 
         #endregion
 
@@ -124,6 +135,7 @@ namespace Thetis
             InitializeVacVstControls();
             InitializeTciVstControls();
             InitPhaseRotatorControls(); // Yurij-eu2av - 2026-07-08: build Phase Rotator extras programmatically
+            InitNnrControls(); // NR5 (NNR) tuning tab
 
             _original_pnlP1_adcs_location = pnlP1_adcs.Location;
 
@@ -216,7 +228,7 @@ namespace Thetis
             chkTCIApplyRxVst = new CheckBoxTS();
             chkTCIApplyRxVst.AutoSize = true;
             chkTCIApplyRxVst.Image = null;
-            chkTCIApplyRxVst.Location = new Point(243, 100);
+            chkTCIApplyRxVst.Location = new Point(258, 100);
             chkTCIApplyRxVst.Name = "chkTCIApplyRxVst";
             chkTCIApplyRxVst.Size = new Size(120, 17);
             chkTCIApplyRxVst.Text = "Apply RX VST";
@@ -228,7 +240,7 @@ namespace Thetis
             chkTCIApplyTxVst = new CheckBoxTS();
             chkTCIApplyTxVst.AutoSize = true;
             chkTCIApplyTxVst.Image = null;
-            chkTCIApplyTxVst.Location = new Point(243, 79);
+            chkTCIApplyTxVst.Location = new Point(258, 79);
             chkTCIApplyTxVst.Name = "chkTCIApplyTxVst";
             chkTCIApplyTxVst.Size = new Size(120, 17);
             chkTCIApplyTxVst.Text = "Apply TX VST";
@@ -537,11 +549,9 @@ namespace Thetis
 
             initStreamOutTab(); //prior to getOptions setup streaming output options
 
-            // Yurij_eu2av: hardware-specific defaults for PureSignal advanced settings.
+            // Yurij_eu2av: hardware-specific default for PureSignal target feedback.
             // Done before getOptions() so a saved user override takes precedence.
             PSTargetFeedbackLevel = HardwareSpecific.PSTargetFeedbackLevel;
-            PSOutlierEnable = HardwareSpecific.PSOutlierEnableDefault;
-            PSOutlierSigma = HardwareSpecific.PSOutlierSigmaDefault;
 
             LogTool.AddLogEntry("        Setup getting options...", "GETOPTIONS");
             getOptions();
@@ -1297,55 +1307,20 @@ namespace Thetis
             comboGanymedeCATPort.Items.AddRange(com_ports);
         }
         private string _skinPath = "";
-
-        private static string AppDataSkinsFolder()
-        {
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenHPSDR", "Skins");
-        }
-
-        private static string[] SkinFolders()
-        {
-            return new[]
-            {
-                Path.Combine(Application.StartupPath, "Skins"),
-                AppDataSkinsFolder()
-            };
-        }
-
-        private string FolderForSkin(string skinName)
-        {
-            if (string.IsNullOrEmpty(skinName)) return "";
-            foreach (string root in SkinFolders())
-            {
-                try
-                {
-                    if (Directory.Exists(Path.Combine(root, skinName)))
-                        return root;
-                }
-                catch { }
-            }
-            return "";
-        }
-
         private void RefreshSkinList()
         {
             comboAppSkin.Items.Clear();
             btnRemoveSkin.Enabled = false;
 
-            var names = new List<string>();
-            foreach (string root in SkinFolders())
-            {
-                if (!Directory.Exists(root)) continue;
-                foreach (string d in Directory.GetDirectories(root))
-                {
-                    string s = Path.GetFileName(d);
-                    if (string.IsNullOrEmpty(s) || s.StartsWith(".")) continue;
-                    if (!names.Contains(s))
-                        names.Add(s);
-                }
-            }
+            string path = ".\\Skins\\";
+            if (Directory.Exists(path))
+                path = ".\\Skins\\";
+            else
+                path = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
+                    "\\OpenHPSDR\\Skins";
+            _skinPath = path;
 
-            if (names.Count == 0)
+            if (!Directory.Exists(path))
             {
                 MessageBox.Show("The console presentation files (skins) were not found.\n" +
                     "Appearance will suffer until this is rectified.\n",
@@ -1355,13 +1330,24 @@ namespace Thetis
                 return;
             }
 
-            names.Sort(StringComparer.CurrentCultureIgnoreCase);
-            comboAppSkin.Items.AddRange(names.ToArray());
-            _skinPath = FolderForSkin(comboAppSkin.Text);
-            if (_skinPath == "")
-                _skinPath = Directory.Exists(AppDataSkinsFolder()) ? AppDataSkinsFolder() : Path.Combine(Application.StartupPath, "Skins");
+            foreach (string d in Directory.GetDirectories(path))
+            {
+                string s = d.Substring(d.LastIndexOf("\\") + 1);
+                if (!s.StartsWith("."))
+                    comboAppSkin.Items.Add(d.Substring(d.LastIndexOf("\\") + 1));
+            }
 
             btnRemoveSkin.Enabled = comboAppSkin.Items.Count > 1;
+
+            if (comboAppSkin.Items.Count == 0)
+            {
+                MessageBox.Show("The console presentation files (skins) were not found.\n" +
+                    "Appearance will suffer until this is rectified.\n",
+                    "Skins files not found",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error, MessageBoxDefaultButton.Button1, Common.MB_TOPMOST); //MW0LGE_[2.9.0.7]);
+                return;
+            }
         }
         private void selectSkin()
         {
@@ -2531,12 +2517,13 @@ namespace Thetis
             chkVAC1WillMute_CheckedChanged(this, e);
             chkVAC2WillMute_CheckedChanged(this, e);
 
-            // RADE (Setup -> DSP -> RADE) rehydrate.  The per-RX master
-            // switches fire FIRST so the children inherit the correct
-            // visibility/enabled state before their own handlers run.  When a
-            // master is off, its force-uncheck loop makes the subsequent
-            // rehydrate handlers see the dependents as already off, so the
-            // RADE block boots hidden/disabled until the user opts in.
+            // RADE (Setup -> DSP -> RADE) rehydrate.  The experimental master
+            // switches are always on -- the per-RX "enable" checkboxes are the
+            // real modem on/off controls -- so the whole RADE UI and the console
+            // FreeDV button stay visible at all times.  The redundant master
+            // checkboxes themselves are hidden.
+            if (chkRX1RadeControl != null) { chkRX1RadeControl.Visible = false; chkRX1RadeControl.Checked = true; }
+            if (chkRX2RadeControl != null) { chkRX2RadeControl.Visible = false; chkRX2RadeControl.Checked = true; }
             chkRX1RadeControl_CheckedChanged(this, e);
             chkRADAE_CheckedChanged(this, e);
             cmbRX1RADEVersion_SelectedIndexChanged(this, e);
@@ -2851,6 +2838,11 @@ namespace Thetis
             nudNR4_snr_rx2_ValueChanged(this, e);
 
             setupNR4algorithm();
+            //
+
+            //nr5 (nnr)
+            ApplyNnrRx(1);
+            ApplyNnrRx(2);
             //
 
             // Transmit Tab
@@ -4408,37 +4400,6 @@ namespace Thetis
                     if (value > (int)udPSTargetFeedbackLevel.Maximum) value = (int)udPSTargetFeedbackLevel.Maximum;
                     if (value < (int)udPSTargetFeedbackLevel.Minimum) value = (int)udPSTargetFeedbackLevel.Minimum;
                     udPSTargetFeedbackLevel.Value = value;
-                }
-            }
-        }
-
-        public bool PSOutlierEnable
-        {
-            get
-            {
-                if (chkPSOutlierEnable != null) return chkPSOutlierEnable.Checked;
-                else return HardwareSpecific.PSOutlierEnableDefault;
-            }
-            set
-            {
-                if (chkPSOutlierEnable != null) chkPSOutlierEnable.Checked = value;
-            }
-        }
-
-        public double PSOutlierSigma
-        {
-            get
-            {
-                if (udPSOutlierSigma != null) return (double)udPSOutlierSigma.Value;
-                else return HardwareSpecific.PSOutlierSigmaDefault;
-            }
-            set
-            {
-                if (udPSOutlierSigma != null)
-                {
-                    if (value > (double)udPSOutlierSigma.Maximum) value = (double)udPSOutlierSigma.Maximum;
-                    if (value < (double)udPSOutlierSigma.Minimum) value = (double)udPSOutlierSigma.Minimum;
-                    udPSOutlierSigma.Value = (decimal)value;
                 }
             }
         }
@@ -13167,11 +13128,16 @@ namespace Thetis
             Cursor c = Cursor.Current;
             Cursor.Current = Cursors.WaitCursor;
 
-            string root = FolderForSkin(comboAppSkin.Text);
-            if (root != "")
+            string path = ".\\Skins\\";
+            if (!Directory.Exists(path + comboAppSkin.Text))
+                path = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
+                        "\\OpenHPSDR\\Skins";
+
+            if (_skinPath == "") _skinPath = path;
+
+            if (Directory.Exists(_skinPath + "\\" + comboAppSkin.Text))
             {
-                _skinPath = root;
-                Skin.Restore(comboAppSkin.Text, root, console);
+                Skin.Restore(comboAppSkin.Text, _skinPath, console);
                 console.UpdateAndromedaSkins();
             }
 
@@ -20098,6 +20064,7 @@ namespace Thetis
         private bool _gpuMeshSavedState = false;
         private bool _gpuComputeSavedState = false;
         private bool _gpuOverlaySavedState = false;
+        private bool _forceCPURenderingActive = false;
 
         private void chkForceCPURendering_CheckedChanged(object sender, EventArgs e)
         {
@@ -20108,9 +20075,13 @@ namespace Thetis
             // forcing CPU rendering forces all GPU features to the CPU mode
             if (chkForceCPURendering.Checked)
             {
-                _gpuMeshSavedState = chkGpuMesh3D.Checked;
-                _gpuComputeSavedState = chkGpuComputeShaders.Checked;
-                _gpuOverlaySavedState = chkGpuOverlay.Checked;
+                if (!_forceCPURenderingActive)
+                {
+                    _gpuMeshSavedState = chkGpuMesh3D.Checked;
+                    _gpuComputeSavedState = chkGpuComputeShaders.Checked;
+                    _gpuOverlaySavedState = chkGpuOverlay.Checked;
+                    _forceCPURenderingActive = true;
+                }
 
                 chkGpuMesh3D.Checked = false;
                 chkGpuComputeShaders.Checked = false;
@@ -20130,9 +20101,16 @@ namespace Thetis
                 chkGpuComputeShaders.Enabled = true;
                 chkGpuOverlay.Enabled = true;
 
-                chkGpuMesh3D.Checked = _gpuMeshSavedState;
-                chkGpuComputeShaders.Checked = _gpuComputeSavedState;
-                chkGpuOverlay.Checked = _gpuOverlaySavedState;
+                // only restore the GPU toggles when we are actually leaving the
+                // forced CPU state; otherwise the saved-state fields would
+                // overwrite the values freshly loaded from the database.
+                if (_forceCPURenderingActive)
+                {
+                    chkGpuMesh3D.Checked = _gpuMeshSavedState;
+                    chkGpuComputeShaders.Checked = _gpuComputeSavedState;
+                    chkGpuOverlay.Checked = _gpuOverlaySavedState;
+                    _forceCPURenderingActive = false;
+                }
             }
 
             console.RestartDisplayDX();
@@ -21400,7 +21378,7 @@ namespace Thetis
                     break;
                 case SetupTab.NB_Tab:
                     TabSetup.SelectedIndex = 3;
-                    TabDSP.SelectedIndex = 9; // select NB tab
+                    TabDSP.SelectedTab = tpDSPNB;
                     break;
                 case SetupTab.CW_Tab:
                     TabSetup.SelectedIndex = 3;
@@ -21420,19 +21398,19 @@ namespace Thetis
                     break;
                 case SetupTab.RADE_Tab:
                     TabSetup.SelectedIndex = 3;
-                    TabDSP.SelectedIndex = 12; // select DSP/RADE tab
+                    TabDSP.SelectedTab = tpDSPRADE;
                     break;
                 case SetupTab.MNF_Tab:
                     TabSetup.SelectedIndex = 3;
-                    TabDSP.SelectedIndex = 8; // select MNF tab
+                    TabDSP.SelectedTab = tpDSPMNF;
                     break;
                 case SetupTab.VOXDE_Tab:
                     TabSetup.SelectedIndex = 3;
-                    TabDSP.SelectedIndex = 10; // select VOX/DE tab
+                    TabDSP.SelectedTab = tpDSPVOXDE;
                     break;
                 case SetupTab.CFC_Tab:
                     TabSetup.SelectedIndex = 3;
-                    TabDSP.SelectedIndex = 11; // select CFC tab
+                    TabDSP.SelectedTab = tpDSPCFC;
                     break;
                 case SetupTab.VAC1_Tab:
                     TabSetup.SelectedIndex = 1; // vac1
@@ -26608,9 +26586,9 @@ namespace Thetis
                         if (nudBandButtons_columns.Maximum != 15) nudBandButtons_columns.Maximum = 15;
                         break;
                     case MeterType.MODE_BUTTONS:
-                        columns = igs.GetSetting<int>("buttonbox_columns", true, 1, 12, 12);
-                        if (nudBandButtons_columns.Value > 12) nudBandButtons_columns.Value = 12;
-                        if (nudBandButtons_columns.Maximum != 12) nudBandButtons_columns.Maximum = 12;
+                        columns = igs.GetSetting<int>("buttonbox_columns", true, 1, 13, 13);
+                        if (nudBandButtons_columns.Value > 13) nudBandButtons_columns.Value = 13;
+                        if (nudBandButtons_columns.Maximum != 13) nudBandButtons_columns.Maximum = 13;
                         break;
                     case MeterType.FILTER_BUTTONS:
                         max_buttons = m.RX == 1 ? 12 : 9; // rx2 only has 9 filter buttons
@@ -29094,8 +29072,7 @@ namespace Thetis
                 // change skin
                 comboAppSkin.SelectedIndex = nToSelect;
 
-                string sSkinRoot = FolderForSkin(sSelectedSkin);
-                string sSkinPath = sSkinRoot == "" ? "" : Path.Combine(sSkinRoot, sSelectedSkin);
+                string sSkinPath = _skinPath + "\\" + sSelectedSkin;
 
                 try
                 {
@@ -29124,10 +29101,8 @@ namespace Thetis
         {
             try
             {
-                string root = FolderForSkin(comboAppSkin.Text);
-                if (root == "") root = Directory.Exists(AppDataSkinsFolder()) ? AppDataSkinsFolder() : _skinPath;
-                if (root != "")
-                    Process.Start("explorer.exe", root);
+                if (_skinPath != "")
+                    Process.Start("explorer.exe", _skinPath);
             }
             catch (Exception)
             {
@@ -29295,6 +29270,204 @@ namespace Thetis
             lblPHROTFc.TabIndex = 163;
             lblPHROTFc.Text = "FC: -";
             grpPhRot.Controls.Add(lblPHROTFc);
+        }
+
+        // NR5 (NNR) tuning tab.  Built programmatically so the NR/ANF tab can
+        // stay as-is.  Controls use the TS types so the generic options
+        // save/restore system persists them by name.
+        private void InitNnrControls()
+        {
+            if (tcDSP == null) return;
+
+            tpDSPNR5 = new TabPage();
+            tpDSPNR5.BackColor = SystemColors.Control;
+            tpDSPNR5.Name = "tpDSPNR5";
+            tpDSPNR5.Padding = new Padding(3);
+            tpDSPNR5.Size = new Size(724, 414);
+            tpDSPNR5.TabIndex = tcDSP.TabCount;
+            tpDSPNR5.Text = "NR5";
+
+            nudNR5_model = new NumericUpDownTS[3];
+            nudNR5_floor = new NumericUpDownTS[3];
+            nudNR5_maxgain = new NumericUpDownTS[3];
+            nudNR5_alpha = new NumericUpDownTS[3];
+            nudNR5_knee = new NumericUpDownTS[3];
+            nudNR5_tau = new NumericUpDownTS[3];
+            nudNR5_smooth_att = new NumericUpDownTS[3];
+            nudNR5_smooth_rel = new NumericUpDownTS[3];
+            chkNR5_cmode = new CheckBoxTS[3];
+
+            for (int rx = 1; rx <= 2; rx++)
+            {
+                int rxi = rx;
+                GroupBoxTS grp = new GroupBoxTS();
+                grp.Location = new Point(rx == 1 ? 8 : 364, 8);
+                grp.Name = "grpNR5_rx" + rx;
+                grp.Size = new Size(352, 398);
+                grp.TabIndex = rx;
+                grp.TabStop = false;
+                grp.Text = "RX" + rx;
+                tpDSPNR5.Controls.Add(grp);
+
+                int y = 24;
+                nudNR5_model[rx] = AddNnrNumeric(grp, "model", rx, "Model (0-3):", y,
+                    0m, 3m, 1m, 0, 1m, "NNR model slot to use (0-3)");
+                y += 30;
+                nudNR5_floor[rx] = AddNnrNumeric(grp, "floor", rx, "Mask floor (dB):", y,
+                    -60m, 0m, -25m, 1, 1m, "Minimum mask magnitude in dB");
+                y += 30;
+                nudNR5_maxgain[rx] = AddNnrNumeric(grp, "maxgain", rx, "Max gain (dB):", y,
+                    0m, 24m, 12m, 1, 1m, "Maximum suppression gain in dB");
+                y += 30;
+                nudNR5_alpha[rx] = AddNnrNumeric(grp, "alpha", rx, "Alpha:", y,
+                    0m, 4m, 1m, 3, 0.05m, "Gain smoothing alpha (0-4)");
+                y += 30;
+                nudNR5_knee[rx] = AddNnrNumeric(grp, "knee", rx, "Alpha knee (dB):", y,
+                    0m, 40m, 10m, 1, 1m, "Knee for the gain smoothing curve in dB");
+                y += 30;
+                nudNR5_tau[rx] = AddNnrNumeric(grp, "tau", rx, "Tau (s):", y,
+                    0.05m, 30m, 2m, 3, 0.05m, "Noise estimate time constant in seconds");
+                y += 30;
+                nudNR5_smooth_att[rx] = AddNnrNumeric(grp, "smooth_att", rx, "Smooth attack (ms):", y,
+                    0m, 500m, 0m, 1, 5m, "Gain attack smoothing time in milliseconds");
+                y += 30;
+                nudNR5_smooth_rel[rx] = AddNnrNumeric(grp, "smooth_rel", rx, "Smooth release (ms):", y,
+                    0m, 500m, 0m, 1, 5m, "Gain release smoothing time in milliseconds");
+                y += 34;
+
+                chkNR5_cmode[rx] = new CheckBoxTS();
+                chkNR5_cmode[rx].AutoSize = true;
+                chkNR5_cmode[rx].Image = null;
+                chkNR5_cmode[rx].Location = new Point(12, y);
+                chkNR5_cmode[rx].Name = "chkNR5_cmode_rx" + rx;
+                chkNR5_cmode[rx].Size = new Size(260, 17);
+                chkNR5_cmode[rx].TabIndex = 20;
+                chkNR5_cmode[rx].Text = "Output audio in both I and Q";
+                chkNR5_cmode[rx].UseVisualStyleBackColor = true;
+                toolTip1.SetToolTip(chkNR5_cmode[rx],
+                    "Checked puts audio in both I and Q (cmode 0); unchecked puts audio in I and 0 in Q (cmode 1).");
+                chkNR5_cmode[rx].CheckedChanged += new EventHandler((s, e) =>
+                {
+                    if (!initializing) ApplyNnrRx(rxi);
+                });
+                grp.Controls.Add(chkNR5_cmode[rx]);
+                y += 30;
+
+                ButtonTS btnReset = new ButtonTS();
+                btnReset.Image = null;
+                btnReset.Location = new Point(12, y);
+                btnReset.Name = "btnNR5_reset_rx" + rx;
+                btnReset.Selectable = true;
+                btnReset.Size = new Size(90, 23);
+                btnReset.TabIndex = 21;
+                btnReset.Text = "Defaults";
+                btnReset.UseVisualStyleBackColor = true;
+                toolTip1.SetToolTip(btnReset, "Restore the default NNR parameters for this receiver");
+                btnReset.Click += new EventHandler((s, e) => ResetNnrRx(rxi));
+                grp.Controls.Add(btnReset);
+            }
+
+            int nrIndex = tcDSP.TabPages.IndexOf(tpDSPNR);
+            tcDSP.TabPages.Insert(nrIndex >= 0 ? nrIndex + 1 : tcDSP.TabPages.Count, tpDSPNR5);
+        }
+
+        private NumericUpDownTS AddNnrNumeric(GroupBoxTS parent, string baseName, int rx,
+            string caption, int y, decimal min, decimal max, decimal value,
+            int decimals, decimal increment, string tip)
+        {
+            LabelTS lbl = new LabelTS();
+            lbl.AutoSize = true;
+            lbl.Image = null;
+            lbl.Location = new Point(12, y + 3);
+            lbl.Name = "lblNR5_" + baseName + "_rx" + rx;
+            lbl.Size = new Size(120, 13);
+            lbl.TabIndex = 0;
+            lbl.Text = caption;
+            parent.Controls.Add(lbl);
+
+            NumericUpDownTS nud = new NumericUpDownTS();
+            nud.DecimalPlaces = decimals;
+            nud.Increment = increment;
+            nud.Location = new Point(150, y);
+            nud.Maximum = max;
+            nud.Minimum = min;
+            nud.Name = "nudNR5_" + baseName + "_rx" + rx;
+            nud.Size = new Size(75, 20);
+            nud.TabIndex = 1;
+            nud.TinyStep = false;
+            nud.Value = value;
+            toolTip1.SetToolTip(nud, tip);
+            nud.ValueChanged += new EventHandler((s, e) =>
+            {
+                if (!initializing) ApplyNnrRx(rx);
+            });
+            parent.Controls.Add(nud);
+
+            return nud;
+        }
+
+        private void ResetNnrRx(int rx)
+        {
+            if (nudNR5_model == null) return;
+            if (rx < 1 || rx > 2) return;
+
+            nudNR5_model[rx].Value = 1m;
+            nudNR5_floor[rx].Value = -25m;
+            nudNR5_maxgain[rx].Value = 12m;
+            nudNR5_alpha[rx].Value = 1m;
+            nudNR5_knee[rx].Value = 10m;
+            nudNR5_tau[rx].Value = 2m;
+            nudNR5_smooth_att[rx].Value = 0m;
+            nudNR5_smooth_rel[rx].Value = 0m;
+            chkNR5_cmode[rx].Checked = false;
+
+            ApplyNnrRx(rx);
+        }
+
+        private void ApplyNnrRx(int rx)
+        {
+            if (console == null || nudNR5_model == null) return;
+            if (rx < 1 || rx > 2) return;
+
+            int model = (int)nudNR5_model[rx].Value;
+            double floor = (double)nudNR5_floor[rx].Value;
+            double maxgain = (double)nudNR5_maxgain[rx].Value;
+            double alpha = (double)nudNR5_alpha[rx].Value;
+            double knee = (double)nudNR5_knee[rx].Value;
+            double tau = (double)nudNR5_tau[rx].Value;
+            double smooth_att = (double)nudNR5_smooth_att[rx].Value;
+            double smooth_rel = (double)nudNR5_smooth_rel[rx].Value;
+            int cmode = chkNR5_cmode[rx].Checked ? 0 : 1;
+
+            RadioDSPRX rad = console.radio.GetDSPRX(rx - 1, 0);
+            RadioDSPRX sub = console.radio.GetDSPRX(rx - 1, 1);
+
+            rad.RXANR5Model = model;
+            sub.RXANR5Model = model;
+
+            rad.RXANR5MaskFloor = floor;
+            sub.RXANR5MaskFloor = floor;
+
+            rad.RXANR5MaxGain = maxgain;
+            sub.RXANR5MaxGain = maxgain;
+
+            rad.RXANR5Alpha = alpha;
+            sub.RXANR5Alpha = alpha;
+
+            rad.RXANR5AlphaKnee = knee;
+            sub.RXANR5AlphaKnee = knee;
+
+            rad.RXANR5Tau = tau;
+            sub.RXANR5Tau = tau;
+
+            rad.RXANR5SmoothAtt = smooth_att;
+            sub.RXANR5SmoothAtt = smooth_att;
+
+            rad.RXANR5SmoothRel = smooth_rel;
+            sub.RXANR5SmoothRel = smooth_rel;
+
+            rad.RXANR5cmode = cmode;
+            sub.RXANR5cmode = cmode;
         }
 
         // Yurij-eu2av - 2026-07-08: Phase Rotator Auto FC toggle.

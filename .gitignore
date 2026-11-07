@@ -411,6 +411,17 @@ Project Files/Source/Thetis-Installer/redist/*.exe
 HANDOFF.md
 MIGRATION_HANDOFF.md
 WDSP2_CONVERSION_PLAN.md
+WDSP_2.11_HANDOFF.md
+WDSP*_HANDOFF.md
+LAYOUTCHECK_HANDOFF.md
+DX_CLUSTER_HANDOFF.md
+
+# WDSP upgrade backups and temporary source files
+Project Files/Source/wdsp.backup.*/
+*.up211
+
+# LayoutCheck is a local-only dev tool - never publish to GitHub
+Project Files/Source/LayoutCheck/
 
 # Release change-log PDFs/docs are published via releases, not kept in the repo
 /*.pdf
@@ -425,6 +436,17 @@ Project Files/lib/NR_Algorithms_x64/src/libspecbleach/old.github
 # Crash dump capture (WER LocalDumps output)
 dumps/
 
+# fldigi is a local dev-tree clone (upstream: w1hkj/fldigi) -- never publish
+# the build/source tree.  Ship the prebuilt sidecar from payload/Fldigi instead.
+/fldigi/
+
+# wsjtx is a local dev-tree clone (upstream: WSJTX/wsjtx) -- never publish
+/wsjtx/
+
+# fldigi handoff notes are local-only -- never publish to GitHub
+HANDOFF_FLDIGI_*.md
+HANDOFF_FT8_*.md
+
 FREEDV_HANDOFF.md
 
 # Local secrets and generated installers — never commit
@@ -433,4 +455,3 @@ discord.json
 # fldigi/WSJT-X sidecar binaries (~240MB); local WiX harvests them when present
 /payload/
 Project Files/lib/vst3sdk/doc/
-

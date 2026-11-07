@@ -145,6 +145,7 @@ namespace Thetis
         public FilterForm filterRX1Form;
         public FilterForm filterRX2Form;
         public DiversityForm diversityForm;
+        public DxClusterForm dxClusterForm;
         // G8NJJ
         public SliderSettingsForm sliderForm;
         public ModeButtonsPopup modePopupForm;
@@ -548,8 +549,6 @@ namespace Thetis
 
         private bool m_bResizeDX2Display = false; // flag to say that dx2 is in middle of resize, drawing will be prevented
 
-        private bool _check_error_log = true;
-        private long _error_log_initial_size = -1;
         private bool _touch_support = false;
 
         // audio recording and playback
@@ -701,12 +700,6 @@ namespace Thetis
 #endif
             AppDataPath = app_data_path;
             //AppDataPath has been set at this point
-
-            if (_check_error_log)
-            {
-                //store size of ErrorLog.txt at this point, and compare at shutdown. If different display a msg
-                _error_log_initial_size = getErrorLogSize();
-            }
 
             if (!Directory.Exists(AppDataPath))
                 Directory.CreateDirectory(AppDataPath);
@@ -1344,24 +1337,6 @@ namespace Thetis
                 _frmShutDownForm.Close(); // last thing to get rid of
                 _frmShutDownForm.Dispose();
                 shutdownLogStringToPath("After _frmShutDownForm.Dispose()");
-            }
-
-            if (_check_error_log)
-            {
-                shutdownLogStringToPath("Before error log size check");
-                //check error log size
-                long new_szie = getErrorLogSize();
-                if (new_szie != _error_log_initial_size)
-                {
-                    //log file has changed
-                    MessageBox.Show("The ErrorLog.txt has been updated during this sesson.\n\n" +
-                    "Please email it to MW0LGE at : [mw0lge@grange-lane.co.uk].\n\n" +
-                    "It is located in this folder : [" + AppDataPath + "].",
-                    "Error Log Change",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1, Common.MB_TOPMOST);
-                }
-                shutdownLogStringToPath("After error log size check");
             }
 
             if (disposing)
@@ -28628,7 +28603,14 @@ namespace Thetis
             if (m_tcpTCIServer != null)
             {
                 shutdownLogStringToPath("Before m_tcpTCIServer.StopServer()");
-                m_tcpTCIServer.StopServer();
+                try
+                {
+                    m_tcpTCIServer.StopServer();
+                }
+                catch (Exception ex)
+                {
+                    shutdownLogStringToPath("m_tcpTCIServer.StopServer() failed: " + ex.ToString());
+                }
                 cmaster.TCIServer = null;
                 removeTCIDelegates();
                 m_tcpTCIServer = null;
@@ -28706,6 +28688,7 @@ namespace Thetis
             if (diversityForm != null) diversityForm.Hide();
             if (heliosDxBox != null && !heliosDxBox.IsDisposed) heliosDxBox.Visible = false;
             if (vkAmpsBox != null && !vkAmpsBox.IsDisposed) vkAmpsBox.Visible = false;
+            if (dxClusterForm != null) dxClusterForm.Hide();
 
             if (psform != null) psform.Hide();
             if (m_frmNotchPopup != null) m_frmNotchPopup.Hide();
@@ -28773,6 +28756,10 @@ namespace Thetis
                 vkAmpsBox.SaveAndCloseHost();
             }
 
+            DxClusterManager.DisconnectAll();
+            DxClusterManager.SaveSettings();
+            if (dxClusterForm != null) dxClusterForm.Close();
+
             if (psform != null) psform.Close();
             if (_frmReleaseNotes != null) _frmReleaseNotes.Close();
             if (m_frmCWXForm != null && !m_frmCWXForm.IsDisposed) m_frmCWXForm.StopEverything(); //[2.10.3.1]MW0LGE
@@ -28816,16 +28803,6 @@ namespace Thetis
             //note frm shutdown close is done in dispose now
 
             shutdownLogStringToPath("Leaving Console_Closing()");
-        }
-        private long getErrorLogSize()
-        {
-            string errorLogPath = Path.Combine(AppDataPath, "ErrorLog.txt");
-            if (File.Exists(errorLogPath))
-            {
-                FileInfo fileInfo = new FileInfo(errorLogPath);
-                return fileInfo.Length;
-            }
-            return -1;
         }
         private void shutdownLogStringToPath(string entry)
         {
@@ -43638,6 +43615,12 @@ namespace Thetis
                         SelectNR(1, true, is_on ? 0 : 4);
                     }
                     break;
+                case "NR5":
+                    {
+                        bool is_on = _nr_selected[0] == 5;
+                        SelectNR(1, true, is_on ? 0 : 5);
+                    }
+                    break;
                 case "ANF":
                     chkANF.Checked = !chkANF.Checked;
                     break;
@@ -43697,6 +43680,12 @@ namespace Thetis
                     {
                         bool is_on = _nr_selected[1] == 4;
                         SelectNR(2, true, is_on ? 0 : 4);
+                    }
+                    break;
+                case "NR5":
+                    {
+                        bool is_on = _nr_selected[1] == 5;
+                        SelectNR(2, true, is_on ? 0 : 5);
                     }
                     break;
                 case "ANF":
@@ -44006,6 +43995,33 @@ namespace Thetis
         private void eSCToolStripMenuItem_Click(object sender, EventArgs e)
         {
             showHideDiversity(true);
+        }
+
+        private void dxClusterToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            showDxClusterForm();
+        }
+
+        private void showDxClusterForm()
+        {
+            if (dxClusterForm == null || dxClusterForm.IsDisposed)
+                dxClusterForm = new DxClusterForm(this);
+
+            if (dxClusterForm.InvokeRequired)
+            {
+                dxClusterForm.Invoke(new MethodInvoker(() =>
+                {
+                    dxClusterForm.Show();
+                    dxClusterForm.BringToFront();
+                    dxClusterForm.Focus();
+                }));
+            }
+            else
+            {
+                dxClusterForm.Show();
+                dxClusterForm.BringToFront();
+                dxClusterForm.Focus();
+            }
         }
 
         private void fldigiToolStripMenuItem_Click(object sender, EventArgs e)
@@ -44527,7 +44543,7 @@ namespace Thetis
             int old_nr = _nr_selected[rx - 1];
 
             _nr_selected[rx - 1] += 1;
-            if (_nr_selected[rx - 1] > 4) _nr_selected[rx - 1] = 0;
+            if (_nr_selected[rx - 1] > 5) _nr_selected[rx - 1] = 0;
 
             setupNR(rx, false);
             setupNR(rx, true);
@@ -44537,7 +44553,7 @@ namespace Thetis
         public void SelectNR(int rx, bool incude_sub, int nr)
         {
             if (rx < 1 || rx > 2) return;
-            if (nr < 0 || nr > 4) return;
+            if (nr < 0 || nr > 5) return;
 
             int old_nr = _nr_selected[rx - 1];
 
@@ -44557,23 +44573,26 @@ namespace Thetis
         {
             //rx = 1 ...
             //sub = true/false on the rx
-            //nr = 1,2,3,4
+            //nr = 0,1,2,3,4,5
             if (rx < 1 || rx > 2) return;
 
             RadioDSPRX rad = radio.GetDSPRX(rx - 1, sub ? 1 : 0);
 
             nR2ToolStripMenuItem.Checked = false;
             NR2StripMenuItem2.Checked = false;
+            NR5ToolStripMenuItem.Checked = false;
+            NR5ToolStripMenuItem_rx2.Checked = false;
             cat_rx2_nr_status = 0;
             cat_rx2_nr2_status = 0;
 
             int nr = _nr_selected[rx - 1];
             if (nr < 0) nr = 0;
-            if (nr > 4) nr = 4;
+            if (nr > 5) nr = 5;
 
             switch (nr)
             {
                 case 0: // all off
+                    rad.RXANR5Run = 0;
                     rad.RXANR4Run = 0;
                     rad.RXANR3Run = 0;
                     rad.RXANR2Run = 0;
@@ -44606,6 +44625,7 @@ namespace Thetis
                     }
                     break;
                 case 1: //nr1
+                    rad.RXANR5Run = 0;
                     rad.RXANR4Run = 0;
                     rad.RXANR3Run = 0;
                     rad.RXANR2Run = 0;
@@ -44638,6 +44658,7 @@ namespace Thetis
                     }
                     break;
                 case 2: //nr2
+                    rad.RXANR5Run = 0;
                     rad.RXANR4Run = 0;
                     rad.RXANR3Run = 0;
                     rad.RXANR1Run = 0;
@@ -44670,6 +44691,7 @@ namespace Thetis
                     }
                     break;
                 case 3: //nr3
+                    rad.RXANR5Run = 0;
                     rad.RXANR4Run = 0;
                     rad.RXANR2Run = 0;
                     rad.RXANR1Run = 0;
@@ -44702,6 +44724,7 @@ namespace Thetis
                     }
                     break;
                 case 4: //nr4
+                    rad.RXANR5Run = 0;
                     rad.RXANR3Run = 0;
                     rad.RXANR2Run = 0;
                     rad.RXANR1Run = 0;
@@ -44729,6 +44752,41 @@ namespace Thetis
                             NR4ToolStripMenuItem_rx2.Checked = true;
                             chkRX2NR.Text = "NR4";
                             lblRX2NRLabel.Text = "NR4";
+                            chkRX2NR.Checked = true;
+                            break;
+                    }
+                    break;
+                case 5: //nnr
+                    rad.RXANR4Run = 0;
+                    rad.RXANR3Run = 0;
+                    rad.RXANR2Run = 0;
+                    rad.RXANR1Run = 0;
+                    rad.RXANR5Run = 1;
+
+                    switch (rx)
+                    {
+                        case 1:
+                            cat_nr_status = 0;
+                            cat_nr2_status = 0;
+                            NRToolStripMenuItem.Checked = false;
+                            NR2ToolStripMenuItem1.Checked = false;
+                            NR3ToolStripMenuItem.Checked = false;
+                            NR4ToolStripMenuItem.Checked = false;
+                            NR5ToolStripMenuItem.Checked = true;
+                            chkNR.Text = "NR5";
+                            lblNRLabel.Text = "NR5";
+                            chkNR.Checked = true;
+                            break;
+                        case 2:
+                            cat_rx2_nr_status = 0;
+                            cat_rx2_nr2_status = 0;
+                            nR2ToolStripMenuItem.Checked = false;
+                            NR2StripMenuItem2.Checked = false;
+                            NR3ToolStripMenuItem_rx2.Checked = false;
+                            NR4ToolStripMenuItem_rx2.Checked = false;
+                            NR5ToolStripMenuItem_rx2.Checked = true;
+                            chkRX2NR.Text = "NR5";
+                            lblRX2NRLabel.Text = "NR5";
                             chkRX2NR.Checked = true;
                             break;
                     }
@@ -46056,6 +46114,9 @@ namespace Thetis
             // update check - quiet GitHub releases query, status-bar label only when a newer release exists
             initUpdateCheck();
 
+            // DX Cluster - load saved nodes and auto-connect any flagged for auto-connect
+            initDxCluster();
+
             // set the multifunction setting to the status bar
             DataTable multitable = AndromedaSet.Tables["Multifunction Settings"];
             toolStripStatusLabelAndromedaMulti.Text = multitable.Rows[CurrentMultifunctionOption]["Multi Description"].ToString();
@@ -46087,6 +46148,19 @@ namespace Thetis
             toolStripStatusLabel_UTCTime.Width = 92;
             toolStripStatusLabel_Date.Width = 104;
             toolStripStatusLabel_LocalTime.Width = 92;
+        }
+
+        private void initDxCluster()
+        {
+            try
+            {
+                DxClusterManager.LoadSettings();
+                DxClusterManager.ConnectAutoNodes();
+            }
+            catch (Exception ex)
+            {
+                Common.LogString("DXCluster init error: " + ex.Message);
+            }
         }
 
         public bool TwoTone
@@ -52838,6 +52912,11 @@ namespace Thetis
                         if (GetSelectedNR(rx) == 4) { SelectNR(rx, true, 0); } else { SelectNR(rx, true, 4); }
                     }
                     break;
+                case OtherButtonId.NR5:
+                    {
+                        if (GetSelectedNR(rx) == 5) { SelectNR(rx, true, 0); } else { SelectNR(rx, true, 5); }
+                    }
+                    break;
                 case OtherButtonId.NB1:
                     {
                         if (GetSelectedNB(rx) == 1) { SetSelectedNB(rx, 0); } else { SetSelectedNB(rx, 1); }
@@ -53028,6 +53107,7 @@ namespace Thetis
                 case OtherButtonId.NR2:
                 case OtherButtonId.NR3:
                 case OtherButtonId.NR4:
+                case OtherButtonId.NR5:
                 case OtherButtonId.ANF:
                     SetupForm.ShowSetupTab(Setup.SetupTab.NR_Tab);
                     break;
@@ -53432,6 +53512,7 @@ namespace Thetis
                 case OtherButtonId.NR2: return GetSelectedNR(rx) == 2;
                 case OtherButtonId.NR3: return GetSelectedNR(rx) == 3;
                 case OtherButtonId.NR4: return GetSelectedNR(rx) == 4;
+                case OtherButtonId.NR5: return GetSelectedNR(rx) == 5;
                 case OtherButtonId.NB1: return GetSelectedNB(rx) == 1;
                 case OtherButtonId.NB2: return GetSelectedNB(rx) == 2;
                 case OtherButtonId.XPA: 

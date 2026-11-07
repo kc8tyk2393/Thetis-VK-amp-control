@@ -1,0 +1,840 @@
+/*  DxClusterManager.cs
+
+This file is part of a program that implements a Software-Defined Radio.
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
+//
+//============================================================================================//
+// DX Cluster - manages a set of parallel telnet node connections.                             //
+//                                                                                             //
+// The manager owns two things:                                                                //
+//   * the live connection set (one DxClusterConnection per configured node), and              //
+//   * a bounded in-memory list of every received spot (newest last), which backs the popup    //
+//     window. A spot is only pushed into the shared SpotManager2 (i.e. drawn on the           //
+//     panadapter) when the master "show on panadapter" flag AND the owning node's flag allow. //
+//                                                                                             //
+// Settings (node list, per-node color/visibility/auto-connect, login callsign) are persisted  //
+// as a single JSON blob in the existing "Options" database table under the key "dx_cluster",   //
+// mirroring how discovered_radios are stored (see setup.cs).                                   //
+//============================================================================================//
+
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Globalization;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+
+namespace Thetis
+{
+    public sealed class DxClusterNodeSettings
+    {
+        public string Host { get; set; } = "";
+        public int Port { get; set; } = 23;
+        public bool AutoConnect { get; set; } = true;
+        public bool ShowOnPanadapter { get; set; } = true;
+        public int ColorArgb { get; set; } = unchecked((int)0xFFFFC800); // gold, opaque
+    }
+
+    public sealed class DxClusterSettings
+    {
+        private const string OptionsTable = "Options";
+        private const string OptionsKey = "dx_cluster";
+
+        public string LoginCallsign { get; set; } = "";
+        public string LoginPassword { get; set; } = "";
+        public bool ShowOnPanadapter { get; set; } = true;
+        public string FilterBand { get; set; } = "All";
+        public string FilterMode { get; set; } = "All";
+        public string FilterText { get; set; } = "";
+        public bool DarkTheme { get; set; } = true;
+        public bool SwlMode { get; set; } = false;
+        public string SwlUrl { get; set; } = ""; // empty = use the season-derived EiBi default
+        public List<DxClusterNodeSettings> Nodes { get; set; } = new List<DxClusterNodeSettings>();
+
+        public string ToJson()
+        {
+            return JsonSerializer.Serialize(this);
+        }
+
+        public static DxClusterSettings FromJson(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return new DxClusterSettings();
+
+            try
+            {
+                DxClusterSettings settings = JsonSerializer.Deserialize<DxClusterSettings>(json);
+                if (settings == null) return new DxClusterSettings();
+                if (settings.Nodes == null) settings.Nodes = new List<DxClusterNodeSettings>();
+                settings.Nodes.RemoveAll(n => n == null || string.IsNullOrWhiteSpace(n.Host));
+                return settings;
+            }
+            catch
+            {
+                return new DxClusterSettings();
+            }
+        }
+
+        public static DxClusterSettings Load()
+        {
+            Dictionary<string, string> options = DB.GetVarsDictionary(OptionsTable);
+            if (options != null && options.TryGetValue(OptionsKey, out string json))
+                return FromJson(json);
+
+            return new DxClusterSettings();
+        }
+
+        public void Save()
+        {
+            Dictionary<string, string> options = DB.GetVarsDictionary(OptionsTable);
+            if (options == null) options = new Dictionary<string, string>();
+
+            options[OptionsKey] = ToJson();
+
+            DB.SaveVarsDictionary(OptionsTable, ref options, true);
+            DB.WriteDB();
+        }
+    }
+
+    public static class DxClusterManager
+    {
+        public const string SourcePrefix = "dxcluster:";
+        public const string SourcePrefixSwl = "swl:";
+        public const int MaxSpots = 3000;
+
+        // when SWL mode is switched off, re-push at most this many of the newest cluster spots so
+        // the panadapter is not flooded by a long-running feed all at once
+        private const int MaxTelnetResyncSpots = 200;
+        private const int SwlRebuildMilliseconds = 60000;
+
+        public static event Action<DxClusterSpot> SpotReceived;
+        public static event Action<DxClusterConnection> ConnectionStateChanged;
+        public static event Action<DxClusterConnection, string> RawLineReceived;
+
+        private static readonly object _lock = new object();
+        private static readonly Dictionary<string, DxClusterConnection> _connections = new Dictionary<string, DxClusterConnection>();
+        private static readonly List<DxClusterSpot> _spots = new List<DxClusterSpot>();
+        private static readonly Dictionary<string, DateTime> _recent = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+
+        private static readonly List<DxClusterSpot> _swlSpots = new List<DxClusterSpot>();
+        private static readonly Dictionary<string, DxClusterSpot> _swlByKey = new Dictionary<string, DxClusterSpot>(StringComparer.Ordinal);
+        private static readonly HashSet<string> _swlPushedKeys = new HashSet<string>(StringComparer.Ordinal);
+        private static List<DxClusterSwlEntry> _swlEntries = new List<DxClusterSwlEntry>();
+        private static System.Timers.Timer _swlTimer;
+        private static volatile bool _swlLoading;
+        private static volatile string _swlStatus = "";
+        private static string _swlUrl = "";
+
+        private static long _nextSpotId = 1;
+        private static bool _recentDirty;
+
+        public static Color DefaultSpotColor { get; set; } = Color.FromArgb(255, 255, 200, 0);
+
+        // persisted state; callers should treat the returned object as owned by the manager
+        public static DxClusterSettings Settings { get; private set; } = new DxClusterSettings();
+
+        public static void LoadSettings()
+        {
+            Settings = DxClusterSettings.Load();
+            if (Settings.Nodes == null) Settings.Nodes = new List<DxClusterNodeSettings>();
+
+            if (Settings.SwlMode)
+            {
+                startSwlTimer();
+                LoadSwlAsync();
+            }
+        }
+
+        public static void SaveSettings()
+        {
+            try { Settings.Save(); }
+            catch (Exception ex) { Common.LogString("DXCluster settings save failed: " + ex.Message); }
+        }
+
+        public static string NodeKey(string host, int port)
+        {
+            return ((host ?? "").Trim().ToLowerInvariant()) + ":" + port;
+        }
+
+        public static DxClusterNodeSettings FindNode(string host, int port)
+        {
+            string key = NodeKey(host, port);
+            return Settings.Nodes.FirstOrDefault(n => n != null && NodeKey(n.Host, n.Port) == key);
+        }
+
+        public static DxClusterNodeSettings GetOrCreateNode(string host, int port)
+        {
+            DxClusterNodeSettings node = FindNode(host, port);
+            if (node != null) return node;
+
+            node = new DxClusterNodeSettings { Host = (host ?? "").Trim(), Port = port };
+            Settings.Nodes.Add(node);
+            return node;
+        }
+
+        public static DxClusterConnection AddConnection(string host, int port, string loginCallsign = "", string loginPassword = "")
+        {
+            string key = NodeKey(host, port);
+
+            // never create a second live connection for the same host:port
+            DxClusterConnection existing = Connections.FirstOrDefault(c => NodeKey(c.Host, c.Port) == key);
+            if (existing != null) return existing;
+
+            DxClusterNodeSettings node = GetOrCreateNode(host, port);
+
+            DxClusterConnection connection = new DxClusterConnection(host, port, loginCallsign, loginPassword)
+            {
+                Node = node,
+                SpotColor = Color.FromArgb(node.ColorArgb),
+                ShowOnPanadapter = node.ShowOnPanadapter,
+            };
+
+            connection.LineReceived += onLineReceived;
+            connection.StateChanged += onStateChanged;
+
+            lock (_lock)
+            {
+                _connections[connection.Id] = connection;
+            }
+
+            return connection;
+        }
+
+        public static void RemoveConnection(string id)
+        {
+            DxClusterConnection connection;
+
+            lock (_lock)
+            {
+                if (!_connections.TryGetValue(id, out connection)) return;
+                _connections.Remove(id);
+            }
+
+            connection.LineReceived -= onLineReceived;
+            connection.StateChanged -= onStateChanged;
+            connection.Dispose();
+        }
+
+        public static DxClusterConnection[] Connections
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _connections.Values.ToArray();
+                }
+            }
+        }
+
+        public static void DisconnectAll()
+        {
+            foreach (DxClusterConnection connection in Connections)
+                connection.Disconnect();
+        }
+
+        public static void ConnectAutoNodes()
+        {
+            foreach (DxClusterNodeSettings node in Settings.Nodes.ToArray())
+            {
+                if (node == null || !node.AutoConnect || string.IsNullOrWhiteSpace(node.Host)) continue;
+
+                DxClusterConnection existing = Connections.FirstOrDefault(c =>
+                    NodeKey(c.Host, c.Port) == NodeKey(node.Host, node.Port));
+                if (existing != null) continue;
+
+                AddConnection(node.Host, node.Port, Settings.LoginCallsign, Settings.LoginPassword).Connect();
+            }
+        }
+
+        public static bool IsConfigured(string host, int port)
+        {
+            return FindNode(host, port) != null;
+        }
+
+        public static DxClusterConnection EnsureConnected(string host, int port, string loginCallsign = "", string loginPassword = "")
+        {
+            string key = NodeKey(host, port);
+            DxClusterConnection connection = Connections.FirstOrDefault(c => NodeKey(c.Host, c.Port) == key);
+
+            if (connection == null)
+            {
+                connection = AddConnection(host, port, loginCallsign, loginPassword);
+                connection.Connect();
+            }
+            else
+            {
+                connection.LoginCallsign = (loginCallsign ?? "").Trim();
+                connection.LoginPassword = loginPassword ?? "";
+
+                if (connection.State == DxClusterConnectionState.Disconnected || connection.State == DxClusterConnectionState.Error)
+                    connection.Connect();
+            }
+
+            return connection;
+        }
+
+        // store the login callsign and push it to any live connection that has not logged in yet
+        // (many DX clusters stream no spots until the user identifies with a callsign)
+        public static void SetLoginCallsign(string callsign)
+        {
+            callsign = (callsign ?? "").Trim();
+            Settings.LoginCallsign = callsign;
+
+            foreach (DxClusterConnection connection in Connections)
+            {
+                connection.LoginCallsign = callsign;
+                connection.SendLogin(callsign);
+            }
+
+            SaveSettings();
+        }
+
+        public static void SetLoginPassword(string password)
+        {
+            password = password ?? "";
+            Settings.LoginPassword = password;
+
+            foreach (DxClusterConnection connection in Connections)
+            {
+                connection.LoginPassword = password;
+                connection.SendPassword(password);
+            }
+
+            SaveSettings();
+        }
+
+        public static void DisconnectAndRemoveNode(string host, int port)
+        {
+            string key = NodeKey(host, port);
+
+            DxClusterConnection connection = Connections.FirstOrDefault(c => NodeKey(c.Host, c.Port) == key);
+            if (connection != null) RemoveConnection(connection.Id);
+
+            DxClusterNodeSettings node = FindNode(host, port);
+            if (node != null) Settings.Nodes.Remove(node);
+
+            // drop this node's spots so they leave the panadapter and the list immediately
+            lock (_lock)
+            {
+                _spots.RemoveAll(s => s != null && s.NodeKey == key);
+            }
+
+            SpotManager2.ClearSpotsBySource(SourcePrefix + (host ?? "").Trim());
+        }
+
+        public static DxClusterSpot[] GetSpots()
+        {
+            lock (_lock)
+            {
+                if (Settings != null && Settings.SwlMode) return _swlSpots.ToArray();
+                return _spots.ToArray();
+            }
+        }
+
+        public static DxClusterSpot FindSpot(long id)
+        {
+            lock (_lock)
+            {
+                for (int i = _spots.Count - 1; i >= 0; i--)
+                {
+                    DxClusterSpot spot = _spots[i];
+                    if (spot != null && spot.Id == id) return spot;
+                }
+
+                for (int i = _swlSpots.Count - 1; i >= 0; i--)
+                {
+                    DxClusterSpot spot = _swlSpots[i];
+                    if (spot != null && spot.Id == id) return spot;
+                }
+            }
+
+            return null;
+        }
+
+        public static int SpotCount
+        {
+            get { lock (_lock) { return Settings != null && Settings.SwlMode ? _swlSpots.Count : _spots.Count; } }
+        }
+
+        public static void ClearSpots()
+        {
+            lock (_lock)
+            {
+                _spots.Clear();
+                _recent.Clear();
+                _recentDirty = false;
+
+                _swlSpots.Clear();
+                _swlByKey.Clear();
+                _swlPushedKeys.Clear();
+            }
+
+            SpotManager2.ClearSpotsBySource(SourcePrefix);
+            SpotManager2.ClearSpotsBySource(SourcePrefixSwl);
+        }
+
+        // re-evaluate which stored spots should be drawn on the panadapter
+        public static void ResyncPanadapter(int maxTelnetSpots = 0)
+        {
+            SpotManager2.ClearSpotsBySource(SourcePrefix);
+            SpotManager2.ClearSpotsBySource(SourcePrefixSwl);
+
+            lock (_lock) _swlPushedKeys.Clear();
+
+            if (Settings == null || !Settings.ShowOnPanadapter) return;
+
+            if (Settings.SwlMode)
+            {
+                DxClusterSpot[] swl;
+                lock (_lock) swl = _swlSpots.ToArray();
+
+                foreach (DxClusterSpot spot in swl)
+                    pushSwlSpot(spot);
+            }
+            else
+            {
+                pushAllTelnetSpots(maxTelnetSpots);
+            }
+        }
+
+        private static void pushAllTelnetSpots(int maxSpots)
+        {
+            DxClusterSpot[] snapshot;
+            lock (_lock) snapshot = _spots.ToArray();
+
+            int start = 0;
+            if (maxSpots > 0 && snapshot.Length > maxSpots) start = snapshot.Length - maxSpots;
+
+            for (int i = start; i < snapshot.Length; i++)
+            {
+                DxClusterSpot spot = snapshot[i];
+                DxClusterNodeSettings node = FindNodeByKey(spot.NodeKey);
+                if (node == null || !node.ShowOnPanadapter) continue;
+
+                pushSpot(spot, Color.FromArgb(node.ColorArgb));
+            }
+        }
+
+        public static DxClusterNodeSettings FindNodeByKey(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return null;
+            return Settings.Nodes.FirstOrDefault(n => n != null && NodeKey(n.Host, n.Port) == key);
+        }
+
+        //====================================================================================//
+        // SWL (broadcast) mode
+        //====================================================================================//
+        public static bool SwlMode
+        {
+            get { return Settings != null && Settings.SwlMode; }
+        }
+
+        public static bool SwlLoading
+        {
+            get { return _swlLoading; }
+        }
+
+        public static string SwlStatus
+        {
+            get { return _swlStatus ?? ""; }
+        }
+
+        public static string SwlUrl
+        {
+            get { return _swlUrl ?? ""; }
+        }
+
+        public static string ResolveSwlUrl()
+        {
+            string url = (Settings == null ? "" : (Settings.SwlUrl ?? "")).Trim();
+            if (url.Length == 0) url = DxClusterSwl.DefaultUrl();
+            return url;
+        }
+
+        public static void SetSwlMode(bool on)
+        {
+            if (Settings == null) return;
+            if (Settings.SwlMode == on) return;
+
+            Settings.SwlMode = on;
+            SaveSettings();
+
+            lock (_lock) _swlPushedKeys.Clear();
+
+            if (on)
+            {
+                // hide telnet spots from the panadapter and start pulling the broadcast schedule
+                ResyncPanadapter();
+                startSwlTimer();
+                LoadSwlAsync();
+            }
+            else
+            {
+                stopSwlTimer();
+
+                // drop the broadcast spots, then re-push the cluster spots (capped so a long feed
+                // does not flood the panadapter all at once)
+                lock (_lock)
+                {
+                    _swlSpots.Clear();
+                    _swlByKey.Clear();
+                }
+                ResyncPanadapter(MaxTelnetResyncSpots);
+            }
+        }
+
+        public static void ReloadSwl()
+        {
+            LoadSwlAsync();
+        }
+
+        public static void LoadSwlAsync()
+        {
+            if (_swlLoading) return;
+
+            _swlLoading = true;
+            _swlStatus = "Loading broadcast schedule...";
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    List<DxClusterSwlEntry> entries;
+                    string url = loadSwlSchedule(out entries);
+                    _swlUrl = url;
+
+                    // language names come from the EiBi README legend - best effort only
+                    try
+                    {
+                        string readme = downloadText(DxClusterSwl.ReadmeUrl);
+                        DxClusterSwl.SetLanguageLegend(readme);
+                    }
+                    catch { }
+
+                    lock (_lock) _swlEntries = entries;
+
+                    _swlStatus = entries.Count == 0 ? "Broadcast schedule is empty." : "";
+                }
+                catch (Exception ex)
+                {
+                    _swlStatus = "SWL load failed: " + ex.Message;
+                }
+                finally
+                {
+                    _swlLoading = false;
+
+                    try { if (SwlMode) RebuildSwlSpots(); } catch { }
+                }
+            });
+        }
+
+        // rebuild the "on air now" set; called on load and on the periodic refresh timer
+        public static void RebuildSwlSpots()
+        {
+            if (!SwlMode) return;
+
+            List<DxClusterSwlEntry> entries;
+            lock (_lock) entries = _swlEntries;
+            if (entries == null) return;
+
+            DateTime now = DateTime.UtcNow;
+            List<DxClusterSwlEntry> active = DxClusterSwl.GetActive(entries, now);
+
+            Dictionary<string, DxClusterSwlEntry> desired = new Dictionary<string, DxClusterSwlEntry>(StringComparer.Ordinal);
+            foreach (DxClusterSwlEntry e in active)
+            {
+                string key = DxClusterSwl.EntryKey(e);
+                if (!desired.ContainsKey(key)) desired[key] = e;
+            }
+
+            List<DxClusterSpot> newlyActive = new List<DxClusterSpot>();
+
+            lock (_lock)
+            {
+                // drop entries that are no longer on air
+                for (int i = _swlSpots.Count - 1; i >= 0; i--)
+                {
+                    DxClusterSpot s = _swlSpots[i];
+                    if (!desired.ContainsKey(s.Key))
+                    {
+                        _swlByKey.Remove(s.Key);
+                        _swlSpots.RemoveAt(i);
+                    }
+                }
+
+                // add newly on-air entries
+                foreach (KeyValuePair<string, DxClusterSwlEntry> kv in desired)
+                {
+                    if (_swlByKey.ContainsKey(kv.Key)) continue;
+
+                    DxClusterSpot spot = buildSwlSpot(kv.Value, now);
+                    _swlSpots.Add(spot);
+                    _swlByKey[kv.Key] = spot;
+                    newlyActive.Add(spot);
+                }
+
+                _swlSpots.Sort((a, b) => a.FrequencyHz.CompareTo(b.FrequencyHz));
+            }
+
+            foreach (DxClusterSpot spot in newlyActive)
+                pushSwlSpot(spot);
+        }
+
+        private static DxClusterSpot buildSwlSpot(DxClusterSwlEntry e, DateTime now)
+        {
+            DxClusterSwl.TryGetWindowUtc(e, now, out DateTime startUtc, out DateTime stopUtc);
+
+            long ttl = (long)Math.Max(30.0, (stopUtc - now).TotalSeconds);
+
+            string days = string.IsNullOrWhiteSpace(e.Days) ? "Daily" : e.Days;
+            string comment = e.TimeText;
+            if (!string.IsNullOrEmpty(days)) comment += "  " + days;
+            if (!string.IsNullOrEmpty(e.Target)) comment += "  " + e.Target;
+            if (!string.IsNullOrEmpty(e.Remarks)) comment += "  " + e.Remarks;
+
+            DxClusterSwl.Mode(e, out string modeLabel, out int modeNumber);
+
+            return new DxClusterSpot
+            {
+                Id = System.Threading.Interlocked.Increment(ref _nextSpotId),
+                Node = "SWL",
+                NodeKey = "swl",
+                Spotter = "",
+                Callsign = e.Station,
+                FrequencyHz = e.FrequencyHz,
+                Comment = comment,
+                Country = DxClusterSwl.CountryName(e.Itu),
+                CountryCode = DxClusterSwl.CountryIso(e.Itu),
+                Language = DxClusterSwl.LanguageName(e.LanguageCode),
+                Mode = modeLabel,
+                ModeNumber = modeNumber,
+                IsSwl = true,
+                SwlSecondsToLive = ttl,
+                UtcTime = startUtc,
+                Key = DxClusterSwl.EntryKey(e),
+            };
+        }
+
+        private static void pushSwlSpot(DxClusterSpot spot)
+        {
+            if (spot == null) return;
+            if (Settings == null || !Settings.ShowOnPanadapter) return;
+
+            lock (_lock)
+            {
+                if (!_swlPushedKeys.Add(spot.Key)) return;
+            }
+
+            DSPMode mode = SpotManager2.SpotModeNumberToDSPMode(spot.ModeNumber, spot.FrequencyHz);
+
+            SpotManager2.JsonSpotData json = new SpotManager2.JsonSpotData
+            {
+                Spotter = "",
+                Comment = spot.Comment,
+                Country = spot.Country,
+                Flag = spot.CountryCode,
+                UtcTime = spot.UtcTime.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'", CultureInfo.InvariantCulture),
+                IsSWL = true,
+                SWLSecondsToLive = spot.SwlSecondsToLive,
+            };
+
+            SpotManager2.AddSpot(
+                spot.Callsign,
+                mode,
+                spot.FrequencyHz,
+                DefaultSpotColor,
+                spot.Comment,
+                json,
+                SourcePrefixSwl);
+        }
+
+        private static void startSwlTimer()
+        {
+            if (_swlTimer == null)
+            {
+                _swlTimer = new System.Timers.Timer(SwlRebuildMilliseconds) { AutoReset = true };
+                _swlTimer.Elapsed += (s, e) => { try { RebuildSwlSpots(); } catch { } };
+            }
+
+            _swlTimer.Enabled = true;
+        }
+
+        private static void stopSwlTimer()
+        {
+            if (_swlTimer != null) _swlTimer.Enabled = false;
+        }
+
+        private static string downloadText(string url)
+        {
+            byte[] data;
+            using (WebClient client = new WebClient())
+            {
+                client.Headers[HttpRequestHeader.UserAgent] = "Thetis";
+                data = client.DownloadData(url);
+            }
+
+            if (data == null || data.Length == 0) return "";
+
+            // honour a UTF-8 BOM; otherwise assume Latin-1 (the EiBi files are not guaranteed UTF-8)
+            if (data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF)
+                return Encoding.UTF8.GetString(data, 3, data.Length - 3);
+
+            return windows1252().GetString(data);
+        }
+
+        private static Encoding _windows1252;
+
+        // Encoding 1252 needs the CodePages provider registered on .NET (net10.0-windows)
+        private static Encoding windows1252()
+        {
+            Encoding encoding = _windows1252;
+            if (encoding != null) return encoding;
+
+            try { Encoding.RegisterProvider(CodePagesEncodingProvider.Instance); }
+            catch { }
+
+            try { encoding = Encoding.GetEncoding(1252); }
+            catch { encoding = Encoding.Latin1; }
+
+            _windows1252 = encoding;
+            return encoding;
+        }
+
+        // Fetch and parse the broadcast schedule. A custom URL is used as-is; for the derived
+        // default we fall back through the neighbouring seasons so a stale/renamed file (404) on
+        // one season does not leave SWL empty.
+        private static string loadSwlSchedule(out List<DxClusterSwlEntry> entries)
+        {
+            entries = new List<DxClusterSwlEntry>();
+
+            string custom = (Settings == null ? "" : (Settings.SwlUrl ?? "")).Trim();
+            if (custom.Length > 0)
+            {
+                entries = DxClusterSwl.ParseCsv(downloadText(custom));
+                return custom;
+            }
+
+            DateTime now = DateTime.UtcNow;
+            List<string> candidates = new List<string>();
+            foreach (int offsetDays in new[] { 0, -183, 183, -366 })
+            {
+                string url = DxClusterSwl.SeasonUrl(now.AddDays(offsetDays));
+                if (!candidates.Contains(url)) candidates.Add(url);
+            }
+
+            Exception last = null;
+            foreach (string url in candidates)
+            {
+                try
+                {
+                    List<DxClusterSwlEntry> parsed = DxClusterSwl.ParseCsv(downloadText(url));
+                    if (parsed.Count > 0)
+                    {
+                        entries = parsed;
+                        return url;
+                    }
+                }
+                catch (Exception ex) { last = ex; }
+            }
+
+            if (last != null) throw last;
+            return DxClusterSwl.DefaultUrl();
+        }
+
+        private static void onStateChanged(DxClusterConnection connection)
+        {
+            ConnectionStateChanged?.Invoke(connection);
+        }
+
+        private static void onLineReceived(DxClusterConnection connection, string line)
+        {
+            RawLineReceived?.Invoke(connection, line);
+
+            if (!DxClusterParser.TryParse(line, connection.Host, out DxClusterSpot spot)) return;
+
+            spot.NodeKey = NodeKey(connection.Host, connection.Port);
+            addSpot(connection, spot);
+        }
+
+        private static void addSpot(DxClusterConnection connection, DxClusterSpot spot)
+        {
+            spot.Id = System.Threading.Interlocked.Increment(ref _nextSpotId);
+
+            lock (_lock)
+            {
+                // suppress repeats of the same call/frequency seen within the last minute
+                string dedupKey = spot.Callsign + "|" + spot.FrequencyHz.ToString(CultureInfo.InvariantCulture);
+                if (_recent.TryGetValue(dedupKey, out DateTime seen) && (DateTime.UtcNow - seen).TotalSeconds < 60)
+                    return;
+
+                _recent[dedupKey] = DateTime.UtcNow;
+                _recentDirty = true;
+
+                _spots.Add(spot);
+                if (_spots.Count > MaxSpots)
+                    _spots.RemoveRange(0, _spots.Count - MaxSpots);
+
+                if (_recentDirty && _recent.Count > 6000)
+                {
+                    pruneRecent();
+                    _recentDirty = false;
+                }
+            }
+
+            // while SWL mode is active the cluster spots are buffered but kept off the panadapter
+            if (Settings != null && !Settings.SwlMode && Settings.ShowOnPanadapter && connection.ShowOnPanadapter)
+                pushSpot(spot, connection.SpotColor);
+
+            SpotReceived?.Invoke(spot);
+        }
+
+        private static void pruneRecent()
+        {
+            DateTime cutoff = DateTime.UtcNow.AddMinutes(-1);
+
+            List<string> dead = new List<string>();
+            foreach (KeyValuePair<string, DateTime> kv in _recent)
+                if (kv.Value < cutoff) dead.Add(kv.Key);
+
+            foreach (string key in dead) _recent.Remove(key);
+        }
+
+        private static void pushSpot(DxClusterSpot spot, Color color)
+        {
+            // map the detected mode (default SSB) to a RX DSP mode for the panadapter spot
+            DSPMode mode = SpotManager2.SpotModeNumberToDSPMode(spot.ModeNumber, spot.FrequencyHz);
+
+            SpotManager2.JsonSpotData json = new SpotManager2.JsonSpotData
+            {
+                Spotter = spot.Spotter,
+                Comment = spot.Comment,
+                UtcTime = spot.UtcTime.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'", CultureInfo.InvariantCulture)
+            };
+
+            SpotManager2.AddSpot(
+                spot.Callsign,
+                mode,
+                spot.FrequencyHz,
+                color,
+                spot.Comment,
+                json,
+                SourcePrefix + spot.Node);
+        }
+    }
+}

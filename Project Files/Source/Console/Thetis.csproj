@@ -199,6 +199,17 @@
     <Compile Include="WSJTX\WsjtManager.cs" />
     <Compile Include="WSJTX\WsjtAudioBridge.cs" />
     <Compile Include="WSJTX\WsjtCtlBridge.cs" />
+    <Compile Include="DXCluster\DxClusterParser.cs" />
+    <Compile Include="DXCluster\DxClusterConnection.cs" />
+    <Compile Include="DXCluster\DxClusterManager.cs" />
+    <Compile Include="DXCluster\DxClusterDefaults.cs" />
+    <Compile Include="DXCluster\DxClusterSwl.cs" />
+    <Compile Include="DXCluster\DxClusterForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="DXCluster\DxClusterServersForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Andromeda\displaysettingsform.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -969,14 +980,10 @@
     <Content Include="Resources\paflt.png" />
     <Content Include="Resources\paok.png" />
     <Content Include="Resources\Thetis2_256.ico" />
-    <Content Include="Resources\Thetis2_48.ico" />
     <Content Include="FTDI2XX.xml" />
-    <Content Include="Resources\thetis-icon.ico" />
     <Content Include="CAT\CATStructs.xml" />
-    <Content Include="hpsdr5-64.ico" />
     <Content Include="images\hpsdr.jpg" />
     <Content Include="images\openhpsdr4_splash.png" />
-    <Content Include="images\PowerSDR.ico" />
   </ItemGroup>
 
   <ItemGroup>

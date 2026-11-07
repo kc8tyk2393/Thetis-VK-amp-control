@@ -743,6 +743,7 @@ namespace Thetis
         private int m_disconnectNotified = 0;
 		private Thread m_clientListenerThread = null;
 		private bool m_markedForDeletion = false;
+		private int m_stopRequested = 0;
 		private bool m_bWebSocket = false;
 		private Thread m_VFODataThread = null;
         private Thread m_sendThread = null;
@@ -1117,9 +1118,10 @@ namespace Thetis
         }
         public void RxAfGainChanged(int rx, bool is_subrx, int gain)
         {
-            // The local RX AF slider changes the speaker only.  TCI clients
-            // keep a fixed receive level, so this is not reported as rx_volume.
-            if (rx < 0 || is_subrx || gain < 0) return;
+            if (m_disconnected) return;
+            int chan = is_subrx ? 1 : 0;
+            double db = audioGainToDb(gain / 100f);
+            sendRxVolume(rx - 1, chan, db);
         }
         public void CTUNChanged(int rx, bool enabled)
         {
@@ -2549,12 +2551,14 @@ namespace Thetis
             sendRxNfEnable(0, consoleThreadSafe.GetMNF(1));
             sendRxNfEnable(1, consoleThreadSafe.GetMNF(2));
 
-            // TCI receive audio is full scale.  Tell clients unity so they
-            // do not copy the local RX AF slider onto their own playback.
-            sendRxVolume(0, 0, 0.0);
-            sendRxVolume(0, 1, 0.0);
-            sendRxVolume(1, 0, 0.0);
-            sendRxVolume(1, 1, 0.0);
+            double rx1vol = audioGainToDb(consoleThreadSafe.RX0Gain / 100f);
+            double rx1Subvol = audioGainToDb(consoleThreadSafe.RX1Gain / 100f);
+            double rx2vol = audioGainToDb(consoleThreadSafe.RX2Gain / 100f);
+
+            sendRxVolume(0, 0, rx1vol);
+            sendRxVolume(0, 1, rx1Subvol);
+            sendRxVolume(1, 0, rx2vol);
+            sendRxVolume(1, 1, rx2vol);
             sendRxBalance(0, 0, 40.0 - (consoleThreadSafe.GetBal(1, false) * 0.8));
             sendRxBalance(0, 1, 40.0 - (consoleThreadSafe.GetBal(1, true) * 0.8));
             sendRxBalance(1, 0, 40.0 - (consoleThreadSafe.GetBal(2, false) * 0.8));
@@ -3013,19 +3017,27 @@ namespace Thetis
 		}
 		public void StopSocketListener()
 		{
+			if (Interlocked.Exchange(ref m_stopRequested, 1) != 0)
+				return;
+
 			TCPIPtciServer server = m_server;
-            notifyServerDisconnected(server);
+			TcpClient client;
+			NetworkStream stream;
 			lock (m_objStreamLock)
 			{
 				m_txUsesTCIAudio = false;
                 m_tciPttActive = false;
+				client = m_client;
+				stream = m_stream;
 			}
+
+            notifyServerDisconnected(server);
 			clearQueuedTxAudio();
             clearRxAudioStreamState();
             server?.ReleaseActiveTxAudioListener(this);
 			server?.RefreshTxAudioSourceState();
-            m_server?.RefreshStreamRunState();
-			if (m_client != null)
+            server?.RefreshStreamRunState();
+			if (client != null)
 			{
                 if (m_tmVFOtimer != null)
                 {
@@ -3055,7 +3067,7 @@ namespace Thetis
                     m_tmTxSensors = null;
                 }
 
-                if (m_stream != null)
+                if (stream != null)
                 {
 					sendStop();
 					
@@ -3063,13 +3075,15 @@ namespace Thetis
 
                     flushOutboundFrames(100);
 
-					m_stream.Close();
+					try { stream.Close(); }
+					catch { }
 					m_stream = null;
 				}
 
 				m_stopClient = true;
                 m_outboundFrameEvent.Set();
-				m_client.Close();
+				try { client.Close(); }
+				catch { }
 
                 if (m_sendThread != null)
                 {
@@ -4678,7 +4692,7 @@ namespace Thetis
                 //set
                 if (!bool.TryParse(args[1], out enable)) return;
                 if (is_extended && !int.TryParse(args[2], out nr)) return;
-                if (nr < 0 || nr > 4) return;
+                if (nr < 0 || nr > 5) return;
 
                 if (enable)
                 {
@@ -4785,11 +4799,32 @@ namespace Thetis
             if (!int.TryParse(args[1], out int chan)) return;
             if (chan < 0 || chan > 1) return;
 
+            int vol = 0;
+
             if (args.Length == 2)
             {
-                // TCI receive level is fixed.  A query does not return the local RX AF slider.
-                if (rx == 0 && chan > 1) return;
-                sendRxVolume(rx, chan, 0.0);
+                //get
+                switch (rx + 1)
+                {
+                    case 1:
+                        if (chan == 0)
+                        {
+                            vol = consoleThreadSafe.RX0Gain; // such horrible naming
+                        }
+                        else if (chan == 1)
+                        {
+                            vol = consoleThreadSafe.RX1Gain;
+                        }
+                        else
+                            return;
+                        break;
+                    case 2:
+                        vol = consoleThreadSafe.RX2Gain; // no sub
+                        break;
+                }
+                double perc = vol / 100f;
+                double db = audioGainToDb(perc);
+                sendRxVolume(rx, chan, db);
             }
             else
             {
@@ -7102,7 +7137,14 @@ namespace Thetis
 				socketListener.ClientConnectedHandlers -= ClientConnectedHandler;
 				socketListener.ClientDisconnectedHandlers -= ClientDisconnectedHandler;
 				socketListener.ClientErrorHandlers -= ClientErrorHandler;
-                socketListener.StopSocketListener();
+                try
+                {
+                    socketListener.StopSocketListener();
+                }
+                catch (Exception ex)
+                {
+                    Debug.Print("TCI StopSocketListener failed during shutdown: " + ex.Message);
+                }
 			}
 		}
 		private void ServerThreadStart()
@@ -7188,7 +7230,14 @@ namespace Thetis
                     socketListener.ClientConnectedHandlers -= ClientConnectedHandler;
                     socketListener.ClientDisconnectedHandlers -= ClientDisconnectedHandler;
                     socketListener.ClientErrorHandlers -= ClientErrorHandler;
-                    socketListener.StopSocketListener();
+                    try
+                    {
+                        socketListener.StopSocketListener();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.Print("TCI StopSocketListener failed during purge: " + ex.Message);
+                    }
                 }
 
 				deleteList = null;

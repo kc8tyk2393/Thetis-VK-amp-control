@@ -352,6 +352,7 @@
         private ToolStripMenuItem cWXToolStripMenuItem;
         private ToolStripMenuItem fldigiToolStripMenuItem;
         private ToolStripMenuItem wsjtXToolStripMenuItem;
+        private ToolStripMenuItem dxClusterToolStripMenuItem;
         private ToolStripMenuItem eSCToolStripMenuItem;
         private ToolStripMenuItem collapseToolStripMenuItem;
         private ToolStripMenuItem filterToolStripMenuItem;
@@ -781,6 +782,7 @@
             this.cWXToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.fldigiToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.wsjtXToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.dxClusterToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.eSCToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.collapseToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.displayControlsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -794,6 +796,7 @@
             this.NR2ToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
             this.NR3ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.NR4ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.NR5ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.ANFToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.NBToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.NB2ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -880,6 +883,7 @@
             this.NR2StripMenuItem2 = new System.Windows.Forms.ToolStripMenuItem();
             this.NR3ToolStripMenuItem_rx2 = new System.Windows.Forms.ToolStripMenuItem();
             this.NR4ToolStripMenuItem_rx2 = new System.Windows.Forms.ToolStripMenuItem();
+            this.NR5ToolStripMenuItem_rx2 = new System.Windows.Forms.ToolStripMenuItem();
             this.aNF2ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.nB2ToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
             this.nBRX2ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -4300,6 +4304,7 @@
             this.cWXToolStripMenuItem,
             this.fldigiToolStripMenuItem,
             this.wsjtXToolStripMenuItem,
+            this.dxClusterToolStripMenuItem,
             this.eSCToolStripMenuItem,
             this.collapseToolStripMenuItem,
             this.displayControlsToolStripMenuItem,
@@ -4401,6 +4406,13 @@
             this.wsjtXToolStripMenuItem.Text = "WSJT-X";
             this.wsjtXToolStripMenuItem.Click += new System.EventHandler(this.wsjtXToolStripMenuItem_Click);
             // 
+            // dxClusterToolStripMenuItem
+            // 
+            this.dxClusterToolStripMenuItem.ForeColor = System.Drawing.SystemColors.ControlLightLight;
+            this.dxClusterToolStripMenuItem.Name = "dxClusterToolStripMenuItem";
+            this.dxClusterToolStripMenuItem.Text = "DX Cluster";
+            this.dxClusterToolStripMenuItem.Click += new System.EventHandler(this.dxClusterToolStripMenuItem_Click);
+            // 
             // eSCToolStripMenuItem
             // 
             this.eSCToolStripMenuItem.ForeColor = System.Drawing.SystemColors.ControlLightLight;
@@ -4466,6 +4478,7 @@
             this.NR2ToolStripMenuItem1,
             this.NR3ToolStripMenuItem,
             this.NR4ToolStripMenuItem,
+            this.NR5ToolStripMenuItem,
             this.ANFToolStripMenuItem,
             this.NBToolStripMenuItem,
             this.NB2ToolStripMenuItem,
@@ -4502,7 +4515,14 @@
             this.NR4ToolStripMenuItem.Name = "NR4ToolStripMenuItem";
             resources.ApplyResources(this.NR4ToolStripMenuItem, "NR4ToolStripMenuItem");
             this.NR4ToolStripMenuItem.Click += new System.EventHandler(this.mnuDSP_Click);
-            // 
+            //
+            // NR5ToolStripMenuItem
+            //
+            this.NR5ToolStripMenuItem.Name = "NR5ToolStripMenuItem";
+            this.NR5ToolStripMenuItem.Text = "NR5";
+            this.NR5ToolStripMenuItem.ToolTipText = "Neural noise reduction";
+            this.NR5ToolStripMenuItem.Click += new System.EventHandler(this.mnuDSP_Click);
+            //
             // ANFToolStripMenuItem
             // 
             this.ANFToolStripMenuItem.Name = "ANFToolStripMenuItem";
@@ -5074,6 +5094,7 @@
             this.NR2StripMenuItem2,
             this.NR3ToolStripMenuItem_rx2,
             this.NR4ToolStripMenuItem_rx2,
+            this.NR5ToolStripMenuItem_rx2,
             this.aNF2ToolStripMenuItem,
             this.nB2ToolStripMenuItem1,
             this.nBRX2ToolStripMenuItem,
@@ -5107,7 +5128,14 @@
             this.NR4ToolStripMenuItem_rx2.Name = "NR4ToolStripMenuItem_rx2";
             resources.ApplyResources(this.NR4ToolStripMenuItem_rx2, "NR4ToolStripMenuItem_rx2");
             this.NR4ToolStripMenuItem_rx2.Click += new System.EventHandler(this.mnuDSPRX2_Click);
-            // 
+            //
+            // NR5ToolStripMenuItem_rx2
+            //
+            this.NR5ToolStripMenuItem_rx2.Name = "NR5ToolStripMenuItem_rx2";
+            this.NR5ToolStripMenuItem_rx2.Text = "NR5";
+            this.NR5ToolStripMenuItem_rx2.ToolTipText = "Neural noise reduction";
+            this.NR5ToolStripMenuItem_rx2.Click += new System.EventHandler(this.mnuDSPRX2_Click);
+            //
             // aNF2ToolStripMenuItem
             // 
             this.aNF2ToolStripMenuItem.Name = "aNF2ToolStripMenuItem";
@@ -8241,8 +8269,10 @@
         private Panel pnlDisplay;
         private ToolStripMenuItem NR3ToolStripMenuItem;
         private ToolStripMenuItem NR4ToolStripMenuItem;
+        private ToolStripMenuItem NR5ToolStripMenuItem;
         private ToolStripMenuItem NR3ToolStripMenuItem_rx2;
         private ToolStripMenuItem NR4ToolStripMenuItem_rx2;
+        private ToolStripMenuItem NR5ToolStripMenuItem_rx2;
         private ButtonTS btnAPF_type;
         private ToolStripStatusLabel toolStripStatusLabel_PAstatus;
         private ToolStripStatusLabel toolStripStatus_PAspacer;

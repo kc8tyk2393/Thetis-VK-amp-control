@@ -983,8 +983,7 @@
 	<!-- fldigi sidecar payload: prebuilt exe + runtime DLLs shipped from the
 	     git-tracked payload\Fldigi folder.  Installed to [INSTALLFOLDER]\Fldigi
 	     so FldigiManager.ResolveExecutable() resolves them as the primary probe.
-	     Refresh payload\Fldigi on every fldigi rebuild. GitHub installer omits
-	     this unless payload\Fldigi is present (INCLUDE_DIGI_SIDECARS). -->
+	     Refresh payload\Fldigi on every fldigi rebuild. -->
 <?ifdef INCLUDE_DIGI_SIDECARS ?>
 	<ComponentGroup Id="FldigiComponents" Directory="FldigiDir">
 		<Component Guid="*"><File Id="FldigiEXE" Source="$(var.FldigiPath)fldigi.exe" KeyPath="yes" Checksum="yes"/></Component>
@@ -1077,8 +1076,7 @@
     <!--   -->
   </Fragment>
 
-  <!-- wsjtx sidecar payload: prebuilt exe + runtime DLLs + Qt plugins shipped
-       from payload\WsjtX when INCLUDE_DIGI_SIDECARS is set. -->
+  <!-- wsjtx sidecar payload when INCLUDE_DIGI_SIDECARS is set. -->
 <?ifdef INCLUDE_DIGI_SIDECARS ?>
   <Fragment>
     <DirectoryRef Id="WsjtXDir">

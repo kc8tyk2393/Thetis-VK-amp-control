@@ -59634,7 +59634,7 @@
             this.radTCI_spot_force_default.AutoSize = true;
             this.radTCI_spot_force_default.Checked = true;
             this.radTCI_spot_force_default.Image = null;
-            this.radTCI_spot_force_default.Location = new System.Drawing.Point(208, 19);
+            this.radTCI_spot_force_default.Location = new System.Drawing.Point(208, 21);
             this.radTCI_spot_force_default.Name = "radTCI_spot_force_default";
             this.radTCI_spot_force_default.Size = new System.Drawing.Size(59, 17);
             this.radTCI_spot_force_default.TabIndex = 2;
@@ -59660,7 +59660,7 @@
             // 
             this.radTCI_spot_force_cwl.AutoSize = true;
             this.radTCI_spot_force_cwl.Image = null;
-            this.radTCI_spot_force_cwl.Location = new System.Drawing.Point(116, 19);
+            this.radTCI_spot_force_cwl.Location = new System.Drawing.Point(116, 21);
             this.radTCI_spot_force_cwl.Name = "radTCI_spot_force_cwl";
             this.radTCI_spot_force_cwl.Size = new System.Drawing.Size(91, 17);
             this.radTCI_spot_force_cwl.TabIndex = 1;
@@ -59674,7 +59674,7 @@
             // 
             this.radTCI_spot_force_cwu.AutoSize = true;
             this.radTCI_spot_force_cwu.Image = null;
-            this.radTCI_spot_force_cwu.Location = new System.Drawing.Point(17, 19);
+            this.radTCI_spot_force_cwu.Location = new System.Drawing.Point(17, 21);
             this.radTCI_spot_force_cwu.Name = "radTCI_spot_force_cwu";
             this.radTCI_spot_force_cwu.Size = new System.Drawing.Size(93, 17);
             this.radTCI_spot_force_cwu.TabIndex = 0;
@@ -59784,7 +59784,7 @@
             this.chkEmulateExpertSDR3Protocol.Name = "chkEmulateExpertSDR3Protocol";
             this.chkEmulateExpertSDR3Protocol.Size = new System.Drawing.Size(167, 17);
             this.chkEmulateExpertSDR3Protocol.TabIndex = 72;
-            this.chkEmulateExpertSDR3Protocol.Text = "Emulate ExpertSDR3 protocol";
+            this.chkEmulateExpertSDR3Protocol.Text = "Emulate ExpertSDR3";
             this.toolTip1.SetToolTip(this.chkEmulateExpertSDR3Protocol, "Causes the TCI protocol message to send \'ExpertSDR3\' instead of \'Thetis\'");
             this.chkEmulateExpertSDR3Protocol.UseVisualStyleBackColor = true;
             this.chkEmulateExpertSDR3Protocol.CheckedChanged += new System.EventHandler(this.chkEmulateExpertSDR3Protocol_CheckedChanged);
@@ -60213,7 +60213,7 @@
             this.groupBoxTS16.Controls.Add(this.chkN1MMEnableRX1);
             this.groupBoxTS16.Location = new System.Drawing.Point(393, 153);
             this.groupBoxTS16.Name = "groupBoxTS16";
-            this.groupBoxTS16.Size = new System.Drawing.Size(323, 159);
+            this.groupBoxTS16.Size = new System.Drawing.Size(323, 160);
             this.groupBoxTS16.TabIndex = 57;
             this.groupBoxTS16.TabStop = false;
             this.groupBoxTS16.Text = "N1MM+ WaterfallBandmap";
@@ -74021,30 +74021,6 @@
             this.udPSTargetFeedbackLevel.Visible = false;
             ((System.ComponentModel.ISupportInitialize)(this.udPSTargetFeedbackLevel)).EndInit();
             this.Controls.Add(this.udPSTargetFeedbackLevel);
-            // Yurij_eu2av: hidden persisted PureSignal outlier settings
-            this.udPSOutlierSigma = new System.Windows.Forms.NumericUpDownTS();
-            ((System.ComponentModel.ISupportInitialize)(this.udPSOutlierSigma)).BeginInit();
-            this.udPSOutlierSigma.Location = new System.Drawing.Point(-100, -100);
-            this.udPSOutlierSigma.Name = "udPSOutlierSigma";
-            this.udPSOutlierSigma.Size = new System.Drawing.Size(50, 20);
-            this.udPSOutlierSigma.TabIndex = 999;
-            this.udPSOutlierSigma.DecimalPlaces = 1;
-            this.udPSOutlierSigma.Increment = new decimal(new int[] { 1, 0, 0, 65536 });
-            this.udPSOutlierSigma.Minimum = new decimal(new int[] { 1, 0, 0, 65536 });
-            this.udPSOutlierSigma.Maximum = new decimal(new int[] { 50, 0, 0, 65536 });
-            this.udPSOutlierSigma.Value = new decimal(new int[] { 25, 0, 0, 65536 });
-            this.udPSOutlierSigma.Visible = false;
-            ((System.ComponentModel.ISupportInitialize)(this.udPSOutlierSigma)).EndInit();
-            this.Controls.Add(this.udPSOutlierSigma);
-            this.chkPSOutlierEnable = new System.Windows.Forms.CheckBoxTS();
-            this.chkPSOutlierEnable.AutoSize = true;
-            this.chkPSOutlierEnable.Location = new System.Drawing.Point(-100, -100);
-            this.chkPSOutlierEnable.Name = "chkPSOutlierEnable";
-            this.chkPSOutlierEnable.Size = new System.Drawing.Size(80, 17);
-            this.chkPSOutlierEnable.TabIndex = 999;
-            this.chkPSOutlierEnable.Text = "Outlier";
-            this.chkPSOutlierEnable.Visible = false;
-            this.Controls.Add(this.chkPSOutlierEnable);
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -78650,8 +78626,6 @@
         private CheckBoxTS chkWaterfall_smear;
         private CheckBoxTS chkN1mm_include_cw_shift;
         private NumericUpDownTS udPSTargetFeedbackLevel;
-        private NumericUpDownTS udPSOutlierSigma;
-        private CheckBoxTS chkPSOutlierEnable;
     }
 }
 
